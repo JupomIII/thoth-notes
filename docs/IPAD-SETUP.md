@@ -71,12 +71,14 @@ add a DHCP reservation.
 
 ## 5. Pair the iPad
 
-**Fastest way.** Double-click `run.bat` on the laptop. The server window shows a
-QR code: point the iPad camera at it and tap the banner that appears. The app
-opens on the sync screen, fills in the address, exchanges the code for the token,
-stores it and runs a first sync. The same link is copied to the clipboard if you
-would rather send it through AirDrop, Messages or Notes. The link only carries
-the short-lived code, never the token.
+**Fastest way.** Double-click `run.bat` on the laptop. It starts the server
+minimised and opens `https://localhost:8443/pair` in your browser: a pairing page
+with a QR code, the code itself, a *copy pairing link* button and a certificate
+download for the iPad. Point the iPad camera at the QR code and tap the banner
+that appears — the app opens on the sync screen, fills in the address, exchanges
+the code for the token, stores it and runs a first sync. The link only carries
+the short-lived code, never the token, and the page is served only to the laptop
+itself.
 
 Web browsers have no API for discovering devices on the local network (Safari
 included), so a scan or a link is the closest thing to automatic pairing; there

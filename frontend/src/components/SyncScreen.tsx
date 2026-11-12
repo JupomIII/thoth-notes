@@ -324,7 +324,7 @@ export function SyncScreen() {
             <ol className="mt-2 space-y-1.5 text-[12.5px] leading-relaxed text-ink-muted">
               <li>
                 <span className="font-medium text-ink">1.</span> Double-click <code className="rounded bg-paper-sunken px-1">run.bat</code>{' '}
-                on the laptop. It starts the server and copies a pairing link.
+                on the laptop. It opens a pairing page with a QR code and copies the link.
               </li>
               <li>
                 <span className="font-medium text-ink">2.</span> Scan the QR code in the server window with the iPad

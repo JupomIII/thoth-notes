@@ -2,6 +2,7 @@ import time
 
 from app import pairing
 from app.config import settings
+from app.security import is_self_client
 
 
 def test_pairing_code_exchanges_for_token(bare_client):
@@ -39,6 +40,38 @@ def test_previous_window_is_still_accepted():
 def test_pairing_is_public_but_token_endpoints_are_not(bare_client):
     assert bare_client.get("/api/health").status_code == 200
     assert bare_client.get("/api/status").status_code == 401
+
+
+def test_pairing_link_endpoint_returns_code(bare_client):
+    response = bare_client.get("/api/pair/link")
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["code"]) == pairing.CODE_LENGTH
+    assert "#/sync" in body["link"]
+    assert body["expiresIn"] > 0
+
+
+def test_pairing_qr_endpoint_returns_svg(bare_client):
+    response = bare_client.get("/api/pair/qr")
+    assert response.status_code == 200
+    assert "svg" in response.headers["content-type"]
+    assert "<svg" in response.text
+
+
+def test_pairing_page_renders_qr_and_code(bare_client):
+    response = bare_client.get("/pair")
+    if response.status_code == 404:
+        return  # no frontend build in this environment
+    assert response.status_code == 200
+    assert "Pair your iPad" in response.text
+    assert pairing.current_code(settings) in response.text
+
+
+def test_self_client_check():
+    assert is_self_client("127.0.0.1")
+    assert is_self_client("::1")
+    assert is_self_client("testclient")
+    assert not is_self_client("203.0.113.9")
 
 
 def test_qr_code_renders_square():

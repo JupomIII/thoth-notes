@@ -99,6 +99,26 @@ def qr_terminal_lines(link: str, columns: int | None = None) -> list[str]:
     ]
 
 
+def qr_svg(link: str) -> str:
+    """Scalable QR code for the pairing page."""
+    try:
+        import qrcode
+        import qrcode.image.svg
+    except ImportError:  # pragma: no cover - optional dependency
+        return (
+            '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="60">'
+            '<text x="10" y="35" font-size="14" fill="#8a8378">qrcode package missing</text></svg>'
+        )
+    code = qrcode.QRCode(
+        border=2,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        image_factory=qrcode.image.svg.SvgPathImage,
+    )
+    code.add_data(link)
+    code.make(fit=True)
+    return code.make_image().to_string(encoding="unicode")
+
+
 _failures: dict[str, list[float]] = {}
 
 

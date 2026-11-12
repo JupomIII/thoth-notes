@@ -7,6 +7,7 @@ set "VENV_PY=backend\.venv\Scripts\python.exe"
 set "CERT=backend\storage\certs\server-cert.pem"
 set "TOKEN_FILE=backend\storage\pairing-token.txt"
 set "APP_URL=https://localhost:8443/"
+set "PAIR_URL=https://localhost:8443/pair"
 
 echo.
 echo   Thoth Notes
@@ -46,25 +47,20 @@ if not exist "%CERT%" (
     exit /b 1
 )
 
-REM Start the server in its own console window so this launcher can exit.
+REM Start the server minimised: the pairing page in the browser is the interface.
 echo   Starting the sync server...
-start "Thoth Notes server" powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start-server.ps1"
+start "Thoth Notes server" /min powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start-server.ps1"
 
-REM Give Uvicorn a moment to bind the port, then open the app.
-timeout /t 3 /nobreak >nul
+REM Wait until the port accepts connections instead of guessing a delay.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$deadline=(Get-Date).AddSeconds(40); while((Get-Date) -lt $deadline){ try { $c=New-Object Net.Sockets.TcpClient; $c.Connect('127.0.0.1',8443); $c.Close(); exit 0 } catch { Start-Sleep -Milliseconds 400 } }; exit 1" >nul 2>&1
+
+start "" "%PAIR_URL%"
 
 echo.
-echo   Server window: "Thoth Notes server"  ^(close it to stop the server^)
-echo   Local app    : %APP_URL%
-echo   iPad profile : backend\storage\certs\thoth-rootCA.cer
+echo   Pairing page : %PAIR_URL%  ^(opened in your browser^)
+echo   Scan the QR code there with the iPad camera.
+echo   The server runs in the minimised "Thoth Notes server" window.
+echo   Lost the code? powershell -ExecutionPolicy Bypass -File scripts\pair.ps1
 echo.
-echo   Pairing link ^(also copied to the clipboard^):
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\pair.ps1"
-echo.
-
-start "" "%APP_URL%"
-
-echo   Opened %APP_URL% in your default browser.
-echo   Leave the server window open while you sync from the iPad.
-timeout /t 6 /nobreak >nul
+timeout /t 8 /nobreak >nul
 endlocal

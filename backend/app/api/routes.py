@@ -25,6 +25,7 @@ from ..models.schemas import (
     PushResponse,
 )
 from .. import pairing
+from ..security import is_self_client
 from ..services import assets as asset_store
 from ..sync import engine
 
@@ -64,6 +65,37 @@ def pair(payload: PairRequest, request: Request) -> PairResponse:
         token=settings.read_token(),
         serverUrl=settings.base_url,
         deviceName=socket.gethostname(),
+    )
+
+
+def _require_self(request: Request) -> None:
+    host = request.client.host if request.client else None
+    if not is_self_client(host):
+        raise HTTPException(
+            status_code=403,
+            detail="Pairing details are only available on the laptop itself.",
+        )
+
+
+@router.get("/pair/link")
+def pair_link(request: Request) -> dict:
+    """Feeds the pairing page on the laptop: code, link and time left."""
+    _require_self(request)
+    return {
+        "code": pairing.current_code(settings),
+        "link": pairing.pairing_link(settings),
+        "serverUrl": settings.base_url,
+        "expiresIn": pairing.seconds_left(settings),
+    }
+
+
+@router.get("/pair/qr")
+def pair_qr(request: Request) -> Response:
+    _require_self(request)
+    return Response(
+        content=pairing.qr_svg(pairing.pairing_link(settings)),
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "no-store"},
     )
 
 

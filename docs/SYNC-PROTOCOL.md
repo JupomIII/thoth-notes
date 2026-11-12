@@ -38,13 +38,22 @@ The JSON Schema lives in `shared/schemas/sync.schema.json`.
 | GET | `/api/conflicts` | Server-side conflict log metadata |
 
 | POST | `/api/pair` | Exchange a six-character pairing code for the token |
+| GET | `/api/pair/link` | Pairing code, deep link and seconds left (laptop only) |
+| GET | `/api/pair/qr` | The pairing link as an SVG QR code (laptop only) |
+| GET | `/pair` | Browser pairing page with the QR code (laptop only) |
+| GET | `/ca` | Root certificate download for the iPad |
 
-All `/api` routes except `/api/health` and `/api/pair` require `X-Thoth-Token`
+All `/api` routes except `/api/health`, `/api/pair`, `/api/pair/link` and
+`/api/pair/qr` require `X-Thoth-Token`
 with the pairing token from `backend/storage/pairing-token.txt`. Requests from
 non-private IP addresses are rejected with `403`.
 
+The pairing page and its two feed endpoints are additionally limited to the
+laptop's own addresses (`127.0.0.1`, `::1`, the machine's LAN IP), so the QR code
+is never visible to another device on the network.
+
 `/api/pair` accepts `{code, deviceName}` and answers `{token, serverUrl,
-deviceName}`. The code is `HMAC(pair-secret, ten-minute window)` truncated to six
+deviceName}`. The code is `HMAC(pair-secret, thirty-minute window)` truncated to six
 characters, so it expires without server state, the previous window is accepted
 for clock skew, and eight wrong attempts per address block pairing until the
 window turns over. It is not the token and cannot be used for anything else.

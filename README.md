@@ -129,12 +129,15 @@ Install and trust `thoth-rootCA.cer` first (Settings → General → VPN & Devic
 Management → Install, then Settings → General → About → Certificate Trust
 Settings).
 
-The server window shows a **QR code**. Point the iPad camera at it: the app opens
-on the sync screen, fills in the address, exchanges the six-character code for
-the token, stores everything locally and syncs. `run.bat` also puts the same link
-on the clipboard (AirDrop, Messages or Notes), and the code can be typed by hand
-under **Cloud → Synchronisation**. Codes change every thirty minutes and never
-contain the token.
+`run.bat` opens a **pairing page in your browser** at
+`https://localhost:8443/pair` (the server itself runs minimised in the
+background). Point the iPad camera at the QR code on that page: the app opens on
+the sync screen, fills in the address, exchanges the six-character code for the
+token, stores everything locally and syncs. The same page has a
+**certificate download** for the iPad, a copy-link button and the code in case it
+is typed by hand under **Cloud → Synchronisation**. Codes change every thirty
+minutes and never contain the token; the page is only served to the laptop
+itself.
 
 Browsers cannot browse the local network — Safari exposes no service-discovery
 API — so the QR code (or the copied link) is what replaces typing an address.

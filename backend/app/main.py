@@ -5,14 +5,12 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-import shutil
-import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import PROTOCOL_VERSION
@@ -21,8 +19,9 @@ from .backup import manager as backups
 from .config import BACKEND_DIR, Settings, settings, local_ip
 from .console import enable_utf8_output
 from . import pairing
+from .pair_page import render_pair_page
 from .database.db import init_db
-from .security import LocalNetworkMiddleware
+from .security import LocalNetworkMiddleware, is_self_client
 
 log = logging.getLogger("thoth")
 
@@ -81,6 +80,26 @@ def create_app(config: Settings | None = None) -> FastAPI:
 
     app.include_router(router)
 
+    @app.get("/pair", include_in_schema=False)
+    def pair_page(request: Request) -> HTMLResponse:
+        host = request.client.host if request.client else None
+        if not is_self_client(host):
+            return HTMLResponse(
+                "<h1>Pairing is only available on the laptop itself.</h1>",
+                status_code=403,
+            )
+        return HTMLResponse(render_pair_page(cfg))
+
+    @app.get("/ca", include_in_schema=False)
+    def ca_profile() -> Response:
+        if not cfg.ca_file.exists():
+            return JSONResponse({"detail": "certificate not generated yet"}, status_code=404)
+        return FileResponse(
+            cfg.ca_file,
+            media_type="application/x-x509-ca-cert",
+            filename="thoth-rootCA.cer",
+        )
+
     if FRONTEND_DIST.exists():
         assets_dir = FRONTEND_DIST / "assets"
         if assets_dir.exists():
@@ -119,16 +138,9 @@ def run() -> None:
     print(f"  iPad address   : {cfg.base_url}/")
     print(f"  LAN IP         : {local_ip()}:{cfg.port}")
     print(f"  Pairing code   : {pairing.current_code(cfg)}   (changes every {cfg.pair_code_minutes} min)")
-    print(f"  Pairing link   : {pairing.pairing_link(cfg)}")
+    scheme = "https" if use_tls else "http"
+    print(f"  Pairing page   : {scheme}://localhost:{cfg.port}/pair   (open on the laptop)")
     print("  Token          : stored locally in storage\\pairing-token.txt, never printed")
-    if sys.stdout.isatty():
-        print()
-        print("  Scan this with the iPad camera to pair:")
-        print()
-        columns = shutil.get_terminal_size((100, 40)).columns
-        for line in pairing.qr_terminal_lines(pairing.pairing_link(cfg), columns=columns):
-            print(f"  {line}")
-        print()
     if not use_tls:
         print("  WARNING: no TLS certificate found. Installed iPad PWAs cannot call http:// endpoints.")
         print("           Run scripts\\install-windows.ps1 once to generate a trusted local certificate.")

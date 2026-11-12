@@ -10,7 +10,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-PUBLIC_PATHS = {"/api/health", "/api/pair"}
+PUBLIC_PATHS = {"/api/health", "/api/pair", "/api/pair/link", "/api/pair/qr"}
 
 
 def is_trusted_client(host: str | None) -> bool:
@@ -25,6 +25,25 @@ def is_trusted_client(host: str | None) -> bool:
     if address.version == 6 and address.ipv4_mapped is not None:
         address = address.ipv4_mapped
     return address.is_loopback or address.is_private or address.is_link_local
+
+
+def is_self_client(host: str | None) -> bool:
+    """True when the request comes from the machine running the server."""
+    if not host:
+        return False
+    if host in {"testclient", "localhost"}:
+        return True
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    if address.version == 6 and address.ipv4_mapped is not None:
+        address = address.ipv4_mapped
+    if address.is_loopback:
+        return True
+    from .config import local_ip
+
+    return str(address) == local_ip()
 
 
 class LocalNetworkMiddleware(BaseHTTPMiddleware):
