@@ -208,7 +208,12 @@ export class DrawingEngine {
     [this.inkCanvas, this.inkCtx] = makeLayer(1);
     [this.liveCanvas, this.liveCtx] = makeLayer(2);
 
-    this.stage.style.position = 'relative';
+    // The host positions the stage (Tailwind `absolute inset-0`). Only fall back
+    // to `relative` when the element is still in normal flow, otherwise an
+    // inline position would collapse the drawing area to zero height.
+    if (window.getComputedStyle(this.stage).position === 'static') {
+      this.stage.style.position = 'relative';
+    }
     this.stage.style.touchAction = 'none';
     this.stage.style.overflow = 'hidden';
 
