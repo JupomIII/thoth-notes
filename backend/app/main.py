@@ -17,6 +17,7 @@ from . import PROTOCOL_VERSION
 from .api.routes import router
 from .backup import manager as backups
 from .config import BACKEND_DIR, Settings, settings, local_ip
+from .console import enable_utf8_output
 from .database.db import init_db
 from .security import LocalNetworkMiddleware
 
@@ -103,6 +104,7 @@ def run() -> None:
     """Starts Uvicorn with TLS when the certificate pair exists."""
     import uvicorn
 
+    enable_utf8_output()
     cfg = settings
     init_db(cfg)
     token = cfg.ensure_token()

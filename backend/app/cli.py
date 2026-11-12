@@ -9,6 +9,7 @@ import sys
 from . import PROTOCOL_VERSION
 from .backup import manager as backups
 from .config import host_name, local_ip, settings
+from .console import enable_utf8_output
 from .database.db import init_db, connection
 
 
@@ -80,6 +81,7 @@ def cmd_status(_args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    enable_utf8_output()
     parser = argparse.ArgumentParser(prog="thoth", description="Thoth Notes server utilities")
     sub = parser.add_subparsers(dest="command")
 
