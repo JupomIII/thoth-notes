@@ -62,10 +62,10 @@ export function SettingsScreen() {
   }
 
   return (
-    <div className="min-h-full pb-[max(2rem,var(--safe-bottom))]">
+    <div className="flex h-full flex-col overflow-hidden">
       <ScreenHeader title="Settings" onBack={() => navigate('/')} />
 
-      <div className="safe-px mx-auto w-full max-w-3xl space-y-4 pt-5">
+      <div className="scroll-pane thin-scroll safe-px mx-auto w-full max-w-3xl min-h-0 flex-1 space-y-4 pb-[max(2rem,var(--safe-bottom))] pt-5">
         {message && (
           <div className="rounded-lg border border-accent/30 bg-accent-soft px-3 py-2 text-[12.5px] text-accent-strong">
             {message}

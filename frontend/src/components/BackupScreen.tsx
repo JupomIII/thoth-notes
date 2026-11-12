@@ -110,14 +110,14 @@ export function BackupScreen() {
   }
 
   return (
-    <div className="min-h-full pb-[max(2rem,var(--safe-bottom))]">
+    <div className="flex h-full flex-col overflow-hidden">
       <ScreenHeader
         title="Backup and restore"
         subtitle="The laptop is the archive; this iPad stays independently usable"
         onBack={() => navigate('/')}
       />
 
-      <div className="safe-px mx-auto w-full max-w-3xl space-y-4 pt-5">
+      <div className="scroll-pane thin-scroll safe-px mx-auto w-full max-w-3xl min-h-0 flex-1 space-y-4 pb-[max(2rem,var(--safe-bottom))] pt-5">
         {message && (
           <div
             className={cx(

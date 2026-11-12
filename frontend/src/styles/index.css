@@ -14,6 +14,10 @@ html,
 body,
 #root {
   height: 100%;
+  /* The document itself never scrolls: it behaves like an app window and only
+     the inner panes scroll. This also removes the iOS rubber-band bounce. */
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 html {
@@ -26,10 +30,21 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   color: #1f1d1a;
   background: #faf8f4;
+  position: fixed;
+  inset: 0;
+  width: 100%;
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
   touch-action: manipulation;
+}
+
+/* Only these panes scroll, and their scroll position never leaks to the page. */
+.scroll-pane {
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Application chrome must not be text-selectable; inputs re-enable it. */

@@ -254,7 +254,7 @@ export function ScreenHeader({
   actions?: ReactNode;
 }) {
   return (
-    <header className="safe-px flex flex-wrap items-center gap-3 border-b border-line bg-paper/90 py-3 pt-[max(0.75rem,var(--safe-top))] backdrop-blur">
+    <header className="safe-px flex shrink-0 flex-wrap items-center gap-3 border-b border-line bg-paper/90 py-3 pt-[max(0.75rem,var(--safe-top))] backdrop-blur">
       {onBack && (
         <Button variant="ghost" onClick={onBack} className="-ml-2 px-2" aria-label="Back">
           <span className="text-[15px]">Back</span>

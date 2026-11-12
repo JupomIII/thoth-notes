@@ -72,7 +72,7 @@ export function SyncScreen() {
   }
 
   return (
-    <div className="min-h-full pb-[max(2rem,var(--safe-bottom))]">
+    <div className="flex h-full flex-col overflow-hidden">
       <ScreenHeader
         title="Synchronisation"
         subtitle="iPad ↔ Windows laptop, over your local network only"
@@ -85,7 +85,7 @@ export function SyncScreen() {
         }
       />
 
-      <div className="safe-px mx-auto w-full max-w-3xl space-y-4 pt-5">
+      <div className="scroll-pane thin-scroll safe-px mx-auto w-full max-w-3xl min-h-0 flex-1 space-y-4 pb-[max(2rem,var(--safe-bottom))] pt-5">
         <section
           className={cx(
             'rounded-xl border px-4 py-3',

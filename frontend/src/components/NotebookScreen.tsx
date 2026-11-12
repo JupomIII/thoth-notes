@@ -126,7 +126,7 @@ export function NotebookScreen({ notebookId }: { notebookId: string }) {
   }
 
   return (
-    <div className="min-h-full pb-[max(2rem,var(--safe-bottom))]">
+    <div className="flex h-full flex-col overflow-hidden">
       <ScreenHeader
         title={notebook.title}
         subtitle={`${plural(list.length, 'page')} · edited ${relativeTime(notebook.updatedAt)}`}
@@ -150,7 +150,7 @@ export function NotebookScreen({ notebookId }: { notebookId: string }) {
         }
       />
 
-      <div className="safe-px mx-auto w-full max-w-6xl pt-4">
+      <div className="scroll-pane thin-scroll safe-px mx-auto w-full max-w-6xl min-h-0 flex-1 pb-[max(2rem,var(--safe-bottom))] pt-4">
         <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="primary"

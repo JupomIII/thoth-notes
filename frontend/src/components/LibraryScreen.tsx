@@ -133,7 +133,7 @@ export function LibraryScreen({ folderId }: { folderId?: string }) {
   }
 
   return (
-    <div className="min-h-full pb-[max(2rem,var(--safe-bottom))]">
+    <div className="flex h-full flex-col overflow-hidden">
       <ScreenHeader
         title={currentFolder?.name ?? 'Library'}
         subtitle={`${plural(visible.length, 'notebook')} · ${plural(activeFolders.length, 'folder')}`}
@@ -153,7 +153,7 @@ export function LibraryScreen({ folderId }: { folderId?: string }) {
         }
       />
 
-      <div className="safe-px mx-auto w-full max-w-6xl pt-4">
+      <div className="scroll-pane thin-scroll safe-px mx-auto w-full max-w-6xl min-h-0 flex-1 pb-[max(2rem,var(--safe-bottom))] pt-4">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[180px] flex-1">
             <Search

@@ -65,7 +65,7 @@ export function App() {
   }
 
   return (
-    <div className="relative min-h-full">
+    <div className="relative h-full overflow-hidden">
       {!status.online && (
         <div className="pointer-events-none fixed left-1/2 top-[max(0.5rem,var(--safe-top))] z-40 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-line bg-paper-raised/95 px-3 py-1 text-[11.5px] text-ink-soft shadow-sm">
           <CloudOff size={13} strokeWidth={2} />
