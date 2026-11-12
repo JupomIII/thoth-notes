@@ -4,10 +4,10 @@ import { Database, Fingerprint, HardDrive, Info, ShieldCheck } from 'lucide-reac
 import { db } from '../storage/db';
 import type { AppSettings } from '../storage/types';
 import { getDeviceId, getSettings, saveSettings } from '../storage/repo';
-import { loadSyncConfig, refreshCounters, saveSyncConfig } from '../sync/engine';
+import { loadSyncConfig, refreshCounters } from '../sync/engine';
 import { formatBytes } from '../lib/download';
 import { navigate } from '../app/router';
-import { Button, Field, ScreenHeader, TextInput, Toggle, cx } from './ui';
+import { Button, ScreenHeader, Toggle, cx } from './ui';
 
 export function SettingsScreen() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -139,39 +139,15 @@ export function SettingsScreen() {
 
         <section className="rounded-xl border border-line bg-paper-raised p-4">
           <h2 className="font-serif text-[17px] text-ink">Synchronisation</h2>
-          <div className="mt-2 space-y-3">
-            <Field label="Server address">
-              <TextInput
-                value={serverUrl}
-                onChange={(event) => setServerUrl(event.target.value)}
-                placeholder="https://192.168.1.20:8443"
-                inputMode="url"
-                autoCapitalize="off"
-              />
-            </Field>
-            <Toggle
-              checked={autoSync}
-              onChange={async (value) => {
-                setAutoSync(value);
-                await saveSyncConfig({ serverUrl, autoSync: value });
-              }}
-              label="Sync in the background"
-              description="Runs every 45 seconds while the app is open and the laptop answers."
-            />
-            <div className="flex gap-2">
-              <Button
-                variant="secondary"
-                onClick={async () => {
-                  await saveSyncConfig({ serverUrl, autoSync });
-                  setMessage('Server address saved.');
-                }}
-              >
-                Save address
-              </Button>
-              <Button variant="ghost" onClick={() => navigate('/sync')}>
-                Full sync settings
-              </Button>
-            </div>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-ink-muted">
+            {serverUrl && autoSync
+              ? `Paired with ${serverUrl}. Pairing, destination, automatic sync and conflicts are on the sync screen.`
+              : 'Not paired yet. Pair once with your laptop; the pairing token stays in this iPad\u2019s own database and never appears in the site.'}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => navigate('/sync')}>
+              Pairing and destination
+            </Button>
           </div>
         </section>
 

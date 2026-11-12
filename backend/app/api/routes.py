@@ -19,9 +19,12 @@ from ..models.schemas import (
     ChangesResponse,
     HealthResponse,
     ImportResult,
+    PairRequest,
+    PairResponse,
     PushRequest,
     PushResponse,
 )
+from .. import pairing
 from ..services import assets as asset_store
 from ..sync import engine
 
@@ -38,6 +41,29 @@ def health() -> HealthResponse:
         version=PROTOCOL_VERSION,
         deviceName=socket.gethostname(),
         time=int(time.time() * 1000),
+    )
+
+
+@router.post("/pair", response_model=PairResponse)
+def pair(payload: PairRequest, request: Request) -> PairResponse:
+    """Exchanges a short-lived code for the pairing token, on the LAN only."""
+    client = request.client.host if request.client else "unknown"
+    if not pairing.allow_attempt(client):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many attempts. Run scripts\\pair.ps1 on the laptop for a new code.",
+        )
+    if not pairing.verify(settings, payload.code):
+        pairing.record_failure(client)
+        raise HTTPException(
+            status_code=401,
+            detail="That pairing code has expired. Run scripts\\pair.ps1 on the laptop for a new one.",
+        )
+    pairing.reset_failures(client)
+    return PairResponse(
+        token=settings.read_token(),
+        serverUrl=settings.base_url,
+        deviceName=socket.gethostname(),
     )
 
 

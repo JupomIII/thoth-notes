@@ -18,6 +18,7 @@ from .api.routes import router
 from .backup import manager as backups
 from .config import BACKEND_DIR, Settings, settings, local_ip
 from .console import enable_utf8_output
+from . import pairing
 from .database.db import init_db
 from .security import LocalNetworkMiddleware
 
@@ -107,15 +108,17 @@ def run() -> None:
     enable_utf8_output()
     cfg = settings
     init_db(cfg)
-    token = cfg.ensure_token()
+    cfg.ensure_token()
     use_tls = cfg.cert_file.exists() and cfg.key_file.exists()
 
     print()
     print("  Thoth Notes local server")
     print(f"  Data directory : {cfg.directory}")
-    print(f"  Pairing token  : {token}")
     print(f"  iPad address   : {cfg.base_url}/")
     print(f"  LAN IP         : {local_ip()}:{cfg.port}")
+    print(f"  Pairing code   : {pairing.current_code(cfg)}   (changes every {cfg.pair_code_minutes} min)")
+    print(f"  Pairing link   : {pairing.pairing_link(cfg)}")
+    print("  Token          : stored locally in storage\\pairing-token.txt, never printed")
     if not use_tls:
         print("  WARNING: no TLS certificate found. Installed iPad PWAs cannot call http:// endpoints.")
         print("           Run scripts\\install-windows.ps1 once to generate a trusted local certificate.")

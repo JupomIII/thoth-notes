@@ -102,8 +102,10 @@ generates a local CA + server certificate, optionally builds the frontend so the
 server can host the app itself, and (when elevated) adds a firewall rule for TCP
 8443 restricted to the Private profile and `LocalSubnet`.
 
-The server prints the token, the certificate path and the HTTPS address. All data
-lives in `backend\storage`:
+The server prints a six-character pairing code, a pairing link, the certificate
+path and the HTTPS address. The long-lived token stays in
+`storage\pairing-token.txt` and is never printed. All data lives in
+`backend\storage`:
 
 ```
 storage/
@@ -113,20 +115,26 @@ storage/
   certs/server-cert.pem    server certificate + CA chain
   certs/thoth-rootCA.cer   install this on the iPad
   pairing-token.txt        keep private
+  pair-secret              keep private (derives the rotating pairing codes)
   config.json              port, CORS origins, rotation
 ```
 
 Nothing is exposed to the public Internet: the server binds to the LAN, rejects
 non-private client IPs and requires the token on every `/api` route except
-`/api/health`.
+`/api/health` and the pairing exchange.
 
 ## 4. Pair the iPad
 
 Install and trust `thoth-rootCA.cer` first (Settings → General → VPN & Device
 Management → Install, then Settings → General → About → Certificate Trust
-Settings). Then in the app: **Cloud → Windows server**, enter
-`https://<computer-name>.local:8443` and paste the token, **Test connection**,
-**Save**, **Sync now**.
+Settings).
+
+`run.bat` prints a pairing link and puts it on the clipboard. Send that link to
+the iPad (AirDrop, Messages or Notes) and tap it: the app fills in the address,
+exchanges the six-character code for the token, stores everything locally and
+syncs. Without the link, open **Cloud → Synchronisation** and type the address
+plus the code that `scripts\pair.ps1` prints. Codes change every ten minutes and
+never contain the token.
 
 **HTTPS is not optional.** An installed PWA on GitHub Pages is an HTTPS origin;
 Safari blocks plain `http://` API calls as mixed content. The installer's
@@ -215,9 +223,11 @@ checklist.
 | `run.bat` | double-click launcher: installs if needed, starts the server, opens the app |
 | `scripts/install-windows.ps1` | venv, dependencies, DB, token, certificate, optional frontend build, firewall |
 | `scripts/start-server.ps1` | starts Uvicorn (HTTPS when a certificate exists) |
+| `scripts/pair.ps1` | prints a fresh pairing code and copies a pairing link |
 | `scripts/backup-now.ps1` | writes a ZIP archive immediately |
 | `scripts/allow-firewall.ps1` | adds the private-network firewall rule (admin) |
 | `python -m app.cli status` | counts, paths, TLS state |
+| `python -m app.cli pair` | prints the current code, link and server address |
 | `python -m app.cli token` | prints the pairing token |
 | `python -m app.cli cert --force` | regenerates the certificate (re-trust on iPad) |
 
@@ -225,6 +235,8 @@ checklist.
 
 * Private-network binding plus a middleware that rejects non-private client IPs.
 * Constant-time pairing-token comparison on every data route.
+* Pairing uses a six-character code derived from a local secret and a ten-minute
+  window; it is single-purpose, rate limited and never contains the token.
 * CORS limited to same-origin, `http://localhost:5173` and
   `https://*.github.io`; edit `allow_origin_regex` in `storage/config.json` to
   restrict further.

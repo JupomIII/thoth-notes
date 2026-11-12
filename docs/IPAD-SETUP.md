@@ -38,11 +38,10 @@ powershell -ExecutionPolicy Bypass -File scripts\install-windows.ps1
 powershell -ExecutionPolicy Bypass -File scripts\start-server.ps1
 ```
 
-The installer prints:
-
-* the pairing token (also in `backend\storage\pairing-token.txt`),
-* the certificate file `backend\storage\certs\thoth-rootCA.cer`,
-* the HTTPS address, normally `https://<computer-name>.local:8443/`.
+The installer prints the certificate file (`backend\storage\certs\thoth-rootCA.cer`)
+and the HTTPS address, normally `https://<computer-name>.local:8443/`. A
+six-character pairing code is shown when the server starts, and
+`scripts\pair.ps1` prints a fresh code plus a one-tap pairing link at any time.
 
 If the iPad cannot reach the server, run `scripts\allow-firewall.ps1` from an
 **Administrator** PowerShell window. The rule is limited to the Private profile
@@ -72,16 +71,28 @@ add a DHCP reservation.
 
 ## 5. Pair the iPad
 
-In the app: **Cloud icon → Windows server**.
+**Fastest way.** Double-click `run.bat` on the laptop: it starts the server and
+copies a pairing link to the clipboard. Send that link to the iPad (AirDrop,
+Messages or Notes) and tap it. The app opens on the sync screen, fills in the
+address, exchanges the code for the token, stores it and runs a first sync. The
+link only carries the short-lived code, never the token.
 
-* Server address: `https://<computer-name>.local:8443` (the app adds `https://`
+**By hand.** Open **Cloud icon → Synchronisation** and enter:
+
+* Laptop address: `https://<computer-name>.local:8443` (the app adds `https://`
   if you omit the scheme).
-* Pairing token: paste from the server window.
-* **Test connection** should answer *"<machine> · protocol v1"*.
-* **Save connection**, then **Sync now**.
+* Pairing code: six characters from the server window or `scripts\pair.ps1`;
+  it changes every ten minutes and the previous code is accepted for one window.
+* **Pair** (or **Test connection** first, which should answer
+  *"<machine> · protocol v1"*).
 
-The token is stored in IndexedDB on the iPad and only sent to that address. It
-is never logged by the app.
+The token is stored in the iPad's own IndexedDB and only sent to that address. It
+is never logged, never shown in full (only dots) and never placed in the URL: the
+app strips the code from the address bar as soon as it reads it. **Forget this
+laptop** removes it again.
+
+The sync screen also shows the destination: laptop name, its notes folder and
+how much is stored there, so you can confirm the notes land where you expect.
 
 ## Why HTTPS is mandatory
 

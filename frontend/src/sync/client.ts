@@ -3,8 +3,10 @@ import type {
   ChangesResponse,
   HealthResponse,
   ImportResult,
+  PairResponse,
   PushRequest,
   PushResponse,
+  ServerStatus,
 } from './protocol';
 
 export class SyncError extends Error {
@@ -27,6 +29,44 @@ export function normalizeServerUrl(raw: string): string {
   }
   value = value.replace(/\/+$/, '');
   return value;
+}
+
+function networkMessage(error: unknown): string {
+  if (error instanceof DOMException && error.name === 'AbortError') {
+    return 'The laptop did not answer in time. Is the server window still open?';
+  }
+  return 'Could not reach the laptop. Check the address, that both devices are on the same Wi-Fi, and that the certificate is trusted on this iPad.';
+}
+
+/** Pairing exchanges a six-character code for the long-lived token. */
+export async function pairWithCode(
+  rawUrl: string,
+  code: string,
+  deviceName: string,
+): Promise<PairResponse> {
+  const base = normalizeServerUrl(rawUrl);
+  if (!base) throw new SyncError('Enter the laptop address first', null, 'config');
+  let response: Response;
+  try {
+    response = await fetch(`${base}/api/pair`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, deviceName }),
+    });
+  } catch (error) {
+    throw new SyncError(networkMessage(error), null, 'network');
+  }
+  if (response.status === 401) {
+    throw new SyncError('That code has expired. Run scripts\\pair.ps1 on the laptop for a fresh one.', 401, 'auth');
+  }
+  if (response.status === 429) {
+    throw new SyncError('Too many attempts. Restart the server window for a new code.', 429, 'auth');
+  }
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new SyncError(`The laptop answered ${response.status}${text ? `: ${text.slice(0, 140)}` : ''}`, response.status, 'server');
+  }
+  return (await response.json()) as PairResponse;
 }
 
 export class SyncClient {
@@ -86,6 +126,11 @@ export class SyncClient {
 
   health(): Promise<HealthResponse> {
     return this.request<HealthResponse>('/api/health', { method: 'GET' }, 8000);
+  }
+
+  /** Where the notes actually land: laptop name, storage folder and counts. */
+  status(): Promise<ServerStatus> {
+    return this.request<ServerStatus>('/api/status', { method: 'GET' }, 8000);
   }
 
   push(records: PushRequest['records']): Promise<PushResponse> {

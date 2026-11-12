@@ -11,16 +11,17 @@ from .backup import manager as backups
 from .config import host_name, local_ip, settings
 from .console import enable_utf8_output
 from .database.db import init_db, connection
+from . import pairing
 
 
 def cmd_init(args: argparse.Namespace) -> int:
     init_db(settings)
-    token = settings.ensure_token()
+    settings.ensure_token()
     settings.save()
     result: dict[str, object] = {
         "protocol": PROTOCOL_VERSION,
         "dataDir": str(settings.directory),
-        "token": token,
+        "tokenFile": str(settings.token_path),
         "hostname": f"{host_name().lower()}.local",
         "lanIp": local_ip(),
         "port": settings.port,
@@ -39,6 +40,25 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 def cmd_token(_args: argparse.Namespace) -> int:
     print(settings.ensure_token())
+    return 0
+
+
+def cmd_pair(_args: argparse.Namespace) -> int:
+    """Prints the current pairing code and a link the iPad can open."""
+    settings.ensure_token()
+    print(
+        json.dumps(
+            {
+                "code": pairing.current_code(settings),
+                "expiresIn": pairing.seconds_left(settings),
+                "link": pairing.pairing_link(settings),
+                "serverUrl": settings.base_url,
+                "hostname": f"{host_name().lower()}.local",
+                "certificate": str(settings.ca_file),
+            },
+            indent=2,
+        )
+    )
     return 0
 
 
@@ -92,6 +112,9 @@ def main(argv: list[str] | None = None) -> int:
 
     token = sub.add_parser("token", help="print the pairing token")
     token.set_defaults(func=cmd_token)
+
+    pair = sub.add_parser("pair", help="print the current pairing code and link")
+    pair.set_defaults(func=cmd_pair)
 
     cert = sub.add_parser("cert", help="(re)generate the local certificate")
     cert.add_argument("--ip", action="append", default=[])

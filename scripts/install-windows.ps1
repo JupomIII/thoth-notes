@@ -119,12 +119,9 @@ if ($isAdmin -and (Get-Command Get-NetFirewallRule -ErrorAction SilentlyContinue
     Write-Host '  Firewall rule skipped (not elevated). Run scripts\allow-firewall.ps1 in an admin window if the iPad cannot connect.' -ForegroundColor Yellow
 }
 
-$tokenPath = Join-Path $backend 'storage\pairing-token.txt'
-$token = if (Test-Path $tokenPath) { (Get-Content $tokenPath -Raw).Trim() } else { '(see backend\storage\pairing-token.txt)' }
-
 Write-Host ''
 Write-Host '  Setup complete.' -ForegroundColor Green
-Write-Host "  Pairing token : $token"
+Write-Host '  Pairing code  : shown when the server starts, or run scripts\pair.ps1 for a fresh one'
 Write-Host '  Certificate   : backend\storage\certs\thoth-rootCA.cer'
 Write-Host '  Start server  : powershell -ExecutionPolicy Bypass -File scripts\start-server.ps1'
 Write-Host ''

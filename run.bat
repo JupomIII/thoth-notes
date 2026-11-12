@@ -55,10 +55,11 @@ timeout /t 3 /nobreak >nul
 
 echo.
 echo   Server window: "Thoth Notes server"  ^(close it to stop the server^)
-echo   iPad address : see the server window ^(https://^<computer-name^>.local:8443^)
-echo   Pairing token: %TOKEN_FILE%
+echo   Local app    : %APP_URL%
 echo   iPad profile : backend\storage\certs\thoth-rootCA.cer
- echo   Local app    : %APP_URL%
+echo.
+echo   Pairing link ^(also copied to the clipboard^):
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\pair.ps1"
 echo.
 
 start "" "%APP_URL%"

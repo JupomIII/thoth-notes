@@ -79,6 +79,17 @@ class HealthResponse(BaseModel):
     time: int
 
 
+class PairRequest(BaseModel):
+    code: str = Field(min_length=4, max_length=32)
+    deviceName: str = Field(default="", max_length=120)
+
+
+class PairResponse(BaseModel):
+    token: str
+    serverUrl: str
+    deviceName: str
+
+
 class BackupInfo(BaseModel):
     name: str
     size: int

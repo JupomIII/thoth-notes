@@ -37,9 +37,17 @@ The JSON Schema lives in `shared/schemas/sync.schema.json`.
 | POST | `/api/backup/import` | Validate and merge a ZIP archive |
 | GET | `/api/conflicts` | Server-side conflict log metadata |
 
-All `/api` routes except `/api/health` require `X-Thoth-Token` with the pairing
-token from `backend/storage/pairing-token.txt`. Requests from non-private IP
-addresses are rejected with `403`.
+| POST | `/api/pair` | Exchange a six-character pairing code for the token |
+
+All `/api` routes except `/api/health` and `/api/pair` require `X-Thoth-Token`
+with the pairing token from `backend/storage/pairing-token.txt`. Requests from
+non-private IP addresses are rejected with `403`.
+
+`/api/pair` accepts `{code, deviceName}` and answers `{token, serverUrl,
+deviceName}`. The code is `HMAC(pair-secret, ten-minute window)` truncated to six
+characters, so it expires without server state, the previous window is accepted
+for clock skew, and eight wrong attempts per address block pairing until the
+window turns over. It is not the token and cannot be used for anything else.
 
 ## Cursor
 

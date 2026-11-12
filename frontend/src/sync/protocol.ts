@@ -26,6 +26,23 @@ export interface HealthResponse {
   time: number;
 }
 
+export interface PairResponse {
+  token: string;
+  serverUrl: string;
+  deviceName: string;
+}
+
+export interface ServerStatus {
+  deviceName: string;
+  counts: Record<string, number>;
+  conflicts: number;
+  cursor: number;
+  devices: string[];
+  dataDir: string;
+  tls: boolean;
+  baseUrl: string;
+}
+
 export interface BackupInfo {
   name: string;
   size: number;
