@@ -129,12 +129,15 @@ Install and trust `thoth-rootCA.cer` first (Settings → General → VPN & Devic
 Management → Install, then Settings → General → About → Certificate Trust
 Settings).
 
-`run.bat` prints a pairing link and puts it on the clipboard. Send that link to
-the iPad (AirDrop, Messages or Notes) and tap it: the app fills in the address,
-exchanges the six-character code for the token, stores everything locally and
-syncs. Without the link, open **Cloud → Synchronisation** and type the address
-plus the code that `scripts\pair.ps1` prints. Codes change every ten minutes and
-never contain the token.
+The server window shows a **QR code**. Point the iPad camera at it: the app opens
+on the sync screen, fills in the address, exchanges the six-character code for
+the token, stores everything locally and syncs. `run.bat` also puts the same link
+on the clipboard (AirDrop, Messages or Notes), and the code can be typed by hand
+under **Cloud → Synchronisation**. Codes change every thirty minutes and never
+contain the token.
+
+Browsers cannot browse the local network — Safari exposes no service-discovery
+API — so the QR code (or the copied link) is what replaces typing an address.
 
 **HTTPS is not optional.** An installed PWA on GitHub Pages is an HTTPS origin;
 Safari blocks plain `http://` API calls as mixed content. The installer's

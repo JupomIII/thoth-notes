@@ -49,7 +49,7 @@ class Settings:
     allow_origin_regex: str = r"https://[A-Za-z0-9-]+\.github\.io"
     # Where the pairing link opens the app; the code in the link expires quickly.
     pair_app_url: str = "https://jupomiii.github.io/thoth-notes"
-    pair_code_minutes: int = 10
+    pair_code_minutes: int = 30
     rotate_keep: int = 7
     auto_backup_hours: int = 24
     max_json_bytes: int = 4 * 1024 * 1024

@@ -43,9 +43,15 @@ def cmd_token(_args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_pair(_args: argparse.Namespace) -> int:
+def cmd_pair(args: argparse.Namespace) -> int:
     """Prints the current pairing code and a link the iPad can open."""
     settings.ensure_token()
+    if getattr(args, "qr", False) and sys.stdout.isatty():
+        print()
+        print("Scan this with the iPad camera:")
+        for line in pairing.qr_terminal_lines(pairing.pairing_link(settings)):
+            print(line)
+        print()
     print(
         json.dumps(
             {
@@ -114,6 +120,7 @@ def main(argv: list[str] | None = None) -> int:
     token.set_defaults(func=cmd_token)
 
     pair = sub.add_parser("pair", help="print the current pairing code and link")
+    pair.add_argument("--qr", action="store_true", help="also print a scannable QR code")
     pair.set_defaults(func=cmd_pair)
 
     cert = sub.add_parser("cert", help="(re)generate the local certificate")

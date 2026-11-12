@@ -327,8 +327,8 @@ export function SyncScreen() {
                 on the laptop. It starts the server and copies a pairing link.
               </li>
               <li>
-                <span className="font-medium text-ink">2.</span> Send that link to this iPad (AirDrop, Messages or Notes)
-                and tap it — the app pairs itself.
+                <span className="font-medium text-ink">2.</span> Scan the QR code in the server window with the iPad
+                camera — or send the link to yourself and tap it. The app pairs itself.
               </li>
               <li>
                 <span className="font-medium text-ink">3.</span> No link? Type the address and the six-character code it
@@ -360,7 +360,7 @@ export function SyncScreen() {
                   Use this laptop ({window.location.host})
                 </Button>
               )}
-              <Field label="Pairing code" hint="Six characters, valid for ten minutes.">
+              <Field label="Pairing code" hint="Six characters, valid for thirty minutes; the server window shows a QR code for the same link.">
                 <TextInput
                   value={code}
                   onChange={(event) => setCode(cleanCode(event.target.value))}

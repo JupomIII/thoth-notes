@@ -75,6 +75,30 @@ def pairing_link(cfg) -> str:
     return f"{cfg.pair_app_url.rstrip('/')}/#/sync?{query}"
 
 
+def qr_terminal_lines(link: str, columns: int | None = None) -> list[str]:
+    """Renders a scannable QR code with ANSI colours for a terminal window.
+
+    Returns an empty list when the optional ``qrcode`` package is missing or the
+    output is not a terminal, so logs stay plain text. Two characters per module
+    keeps the squares square; narrow windows get one to avoid wrapping.
+    """
+    try:
+        import qrcode
+    except ImportError:  # pragma: no cover - optional dependency
+        return []
+    code = qrcode.QRCode(border=2, error_correction=qrcode.constants.ERROR_CORRECT_M)
+    code.add_data(link)
+    code.make(fit=True)
+    matrix = code.get_matrix()
+    span = 2 if columns is None or columns >= len(matrix[0]) * 2 + 4 else 1
+    white, black, reset = "\x1b[47m", "\x1b[40m", "\x1b[0m"
+    cell = " " * span
+    return [
+        "".join(f"{white}{cell}" if light else f"{black}{cell}" for light in row) + reset
+        for row in matrix
+    ]
+
+
 _failures: dict[str, list[float]] = {}
 
 

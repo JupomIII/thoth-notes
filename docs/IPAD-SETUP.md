@@ -71,18 +71,23 @@ add a DHCP reservation.
 
 ## 5. Pair the iPad
 
-**Fastest way.** Double-click `run.bat` on the laptop: it starts the server and
-copies a pairing link to the clipboard. Send that link to the iPad (AirDrop,
-Messages or Notes) and tap it. The app opens on the sync screen, fills in the
-address, exchanges the code for the token, stores it and runs a first sync. The
-link only carries the short-lived code, never the token.
+**Fastest way.** Double-click `run.bat` on the laptop. The server window shows a
+QR code: point the iPad camera at it and tap the banner that appears. The app
+opens on the sync screen, fills in the address, exchanges the code for the token,
+stores it and runs a first sync. The same link is copied to the clipboard if you
+would rather send it through AirDrop, Messages or Notes. The link only carries
+the short-lived code, never the token.
+
+Web browsers have no API for discovering devices on the local network (Safari
+included), so a scan or a link is the closest thing to automatic pairing; there
+is nothing to type either way.
 
 **By hand.** Open **Cloud icon → Synchronisation** and enter:
 
 * Laptop address: `https://<computer-name>.local:8443` (the app adds `https://`
   if you omit the scheme).
 * Pairing code: six characters from the server window or `scripts\pair.ps1`;
-  it changes every ten minutes and the previous code is accepted for one window.
+  it changes every thirty minutes and the previous code is accepted for one window.
 * **Pair** (or **Test connection** first, which should answer
   *"<machine> · protocol v1"*).
 

@@ -39,3 +39,22 @@ def test_previous_window_is_still_accepted():
 def test_pairing_is_public_but_token_endpoints_are_not(bare_client):
     assert bare_client.get("/api/health").status_code == 200
     assert bare_client.get("/api/status").status_code == 401
+
+
+def test_qr_code_renders_square():
+    lines = pairing.qr_terminal_lines("https://example.com/#/sync?server=x&code=ABCDEF", columns=120)
+    if not lines:
+        return  # optional qrcode package not installed
+    plain = [line.replace("\x1b[47m", "").replace("\x1b[40m", "").replace("\x1b[0m", "") for line in lines]
+    assert len(plain) > 10
+    assert len({len(row) for row in plain}) == 1
+    assert len(plain[0]) in (len(plain), len(plain) * 2)
+
+
+def test_qr_narrows_for_a_small_window():
+    wide = pairing.qr_terminal_lines("https://example.com/#/sync?code=ABCDEF", columns=120)
+    narrow = pairing.qr_terminal_lines("https://example.com/#/sync?code=ABCDEF", columns=60)
+    if not wide:
+        return
+    strip = lambda line: line.replace("\x1b[47m", "").replace("\x1b[40m", "").replace("\x1b[0m", "")  # noqa: E731
+    assert len(strip(narrow[0])) < len(strip(wide[0]))

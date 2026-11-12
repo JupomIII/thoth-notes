@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import shutil
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -119,6 +121,14 @@ def run() -> None:
     print(f"  Pairing code   : {pairing.current_code(cfg)}   (changes every {cfg.pair_code_minutes} min)")
     print(f"  Pairing link   : {pairing.pairing_link(cfg)}")
     print("  Token          : stored locally in storage\\pairing-token.txt, never printed")
+    if sys.stdout.isatty():
+        print()
+        print("  Scan this with the iPad camera to pair:")
+        print()
+        columns = shutil.get_terminal_size((100, 40)).columns
+        for line in pairing.qr_terminal_lines(pairing.pairing_link(cfg), columns=columns):
+            print(f"  {line}")
+        print()
     if not use_tls:
         print("  WARNING: no TLS certificate found. Installed iPad PWAs cannot call http:// endpoints.")
         print("           Run scripts\\install-windows.ps1 once to generate a trusted local certificate.")
