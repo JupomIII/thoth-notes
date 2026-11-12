@@ -71,8 +71,10 @@ git remote add origin git@github.com:<user>/<repo>.git
 git push -u origin main
 ```
 
-1. Push the repository to GitHub.
+1. Push the repository to GitHub (it lives at `https://github.com/JupomIII/thoth-notes`).
 2. **Settings → Pages → Source: GitHub Actions**.
+
+   Live app: **https://jupomiii.github.io/thoth-notes/**
 3. The workflow (`.github/workflows/deploy.yml`) type-checks, tests, builds, adds
    a `404.html` SPA fallback and publishes `frontend/dist` on every push to
    `main`.
@@ -83,6 +85,11 @@ GitHub Pages hosts the **application only**. Notes, tokens and certificates are
 never committed (`backend/storage/` and `*.db` are ignored).
 
 ## 3. Install the Windows server
+
+Double-click **`run.bat`** in the repository root: it installs on first run, starts
+the server in its own window and opens `https://localhost:8443/` in the browser.
+
+Or run the two scripts directly:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\install-windows.ps1
@@ -205,6 +212,7 @@ checklist.
 
 | Script | Purpose |
 | --- | --- |
+| `run.bat` | double-click launcher: installs if needed, starts the server, opens the app |
 | `scripts/install-windows.ps1` | venv, dependencies, DB, token, certificate, optional frontend build, firewall |
 | `scripts/start-server.ps1` | starts Uvicorn (HTTPS when a certificate exists) |
 | `scripts/backup-now.ps1` | writes a ZIP archive immediately |
