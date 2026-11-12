@@ -1,0 +1,29 @@
+# dependencies
+node_modules/
+frontend/node_modules/
+backend/.venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# build output
+frontend/dist/
+frontend/dev-dist/
+*.tsbuildinfo
+
+# local user data — never commit notes, tokens or certificates
+backend/storage/
+backend/storage/certs/
+*.db
+*.db-wal
+*.db-shm
+pairing-token.txt
+.env
+.dev.vars
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

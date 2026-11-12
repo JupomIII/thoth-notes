@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://thoth-notes.local/schemas/sync.schema.json",
+  "title": "Thoth Notes sync protocol v1",
+  "description": "Envelope shared by the iPad IndexedDB store and the Windows SQLite archive.",
+  "type": "object",
+  "$defs": {
+    "kind": {
+      "type": "string",
+      "enum": ["folder", "notebook", "page", "stroke", "text", "image", "asset"]
+    },
+    "record": {
+      "type": "object",
+      "required": ["kind", "id", "data", "createdAt", "updatedAt", "version", "deviceId"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/kind" },
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "data": { "type": "object", "description": "Full entity including envelope fields." },
+        "createdAt": { "type": "integer", "minimum": 0, "description": "ms since epoch" },
+        "updatedAt": { "type": "integer", "minimum": 0, "description": "ms since epoch" },
+        "version": { "type": "integer", "minimum": 0 },
+        "deviceId": { "type": "string" },
+        "deletedAt": { "type": ["integer", "null"], "description": "tombstone timestamp" }
+      },
+      "additionalProperties": false
+    },
+    "strokePoint": {
+      "type": "object",
+      "required": ["x", "y", "pressure", "tiltX", "tiltY", "timestamp"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "pressure": { "type": "number", "minimum": 0, "maximum": 1 },
+        "tiltX": { "type": "number", "minimum": -90, "maximum": 90 },
+        "tiltY": { "type": "number", "minimum": -90, "maximum": 90 },
+        "timestamp": { "type": "number" }
+      }
+    },
+    "strokeData": {
+      "type": "object",
+      "required": ["id", "pageId", "tool", "color", "width", "opacity", "points"],
+      "properties": {
+        "tool": {
+          "type": "string",
+          "enum": [
+            "fountain",
+            "ballpoint",
+            "pencil",
+            "highlighter",
+            "eraser",
+            "lasso",
+            "text",
+            "image",
+            "line",
+            "rect",
+            "circle",
+            "arrow"
+          ]
+        },
+        "color": { "type": "string", "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$" },
+        "width": { "type": "number", "minimum": 0.1 },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "shape": { "type": ["string", "null"], "enum": ["line", "rect", "circle", "arrow", null] },
+        "points": { "type": "array", "items": { "$ref": "#/$defs/strokePoint" }, "minItems": 1 }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "title": "push request",
+      "required": ["deviceId", "records"],
+      "properties": {
+        "deviceId": { "type": "string", "minLength": 1 },
+        "records": { "type": "array", "maxItems": 500, "items": { "$ref": "#/$defs/record" } }
+      }
+    },
+    {
+      "title": "push response",
+      "required": ["accepted", "conflicts", "cursor"],
+      "properties": {
+        "accepted": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind", "id", "version", "updatedAt"],
+            "properties": {
+              "kind": { "$ref": "#/$defs/kind" },
+              "id": { "type": "string" },
+              "version": { "type": "integer" },
+              "updatedAt": { "type": "integer" }
+            }
+          }
+        },
+        "conflicts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind", "id", "server", "client"],
+            "properties": {
+              "kind": { "$ref": "#/$defs/kind" },
+              "id": { "type": "string" },
+              "server": { "$ref": "#/$defs/record" },
+              "client": { "$ref": "#/$defs/record" }
+            }
+          }
+        },
+        "cursor": { "type": "integer" },
+        "serverTime": { "type": "integer" }
+      }
+    },
+    {
+      "title": "changes response",
+      "required": ["records", "cursor", "hasMore"],
+      "properties": {
+        "records": { "type": "array", "items": { "$ref": "#/$defs/record" } },
+        "cursor": { "type": "integer" },
+        "hasMore": { "type": "boolean" }
+      }
+    }
+  ]
+}
