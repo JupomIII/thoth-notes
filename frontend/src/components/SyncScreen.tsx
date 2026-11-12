@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { AlertTriangle, Check, CloudOff, RefreshCw } from 'lucide-react';
 import { db } from '../storage/db';
@@ -25,7 +25,9 @@ export function SyncScreen() {
   const [testing, setTesting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const status = useLiveQuery(async () => syncStatus.getSnapshot(), [], syncStatus.getSnapshot());
+  // The sync store is not a Dexie table: subscribing to it directly is what makes
+  // the status card change from "Not configured" to the sync result.
+  const status = useSyncExternalStore(syncStatus.subscribe, syncStatus.getSnapshot);
   const conflicts = useLiveQuery(() => db.conflicts.orderBy('createdAt').reverse().toArray(), []);
 
   useEffect(() => {
