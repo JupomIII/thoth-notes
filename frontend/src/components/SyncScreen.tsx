@@ -27,6 +27,7 @@ import { syncStatus } from '../sync/store';
 import { relativeTime } from '../lib/format';
 import { navigate } from '../app/router';
 import { Button, Field, ScreenHeader, Spinner, TextInput, Toggle, cx } from './ui';
+import { LocalHttpProbe } from './LocalHttpProbe';
 
 type Config = Awaited<ReturnType<typeof loadSyncConfig>>;
 
@@ -579,6 +580,8 @@ export function SyncScreen() {
             </ul>
           )}
         </section>
+
+        <LocalHttpProbe serverUrl={serverUrl} />
 
         <details className="rounded-xl border border-line bg-paper-sunken p-4 text-[12.5px] leading-relaxed text-ink-soft">
           <summary className="flex cursor-pointer select-none items-center gap-2 font-serif text-[16px] text-ink">
