@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request, Response
+from starlette.requests import ClientDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -22,7 +23,9 @@ from .console import enable_utf8_output
 from . import pairing
 from .pair_page import render_pair_page
 from .setup_page import render_setup_page
+from .accept_loop import install as install_accept_resilience
 from .database.db import init_db
+from .disconnects import install as install_quiet_disconnects
 from .security import LocalNetworkMiddleware, is_self_client
 
 log = logging.getLogger("thoth")
@@ -41,11 +44,20 @@ async def _auto_backup_loop(config: Settings) -> None:
         await asyncio.sleep(interval)
 
 
+async def client_closed(_request: Request, _exc: Exception) -> JSONResponse:
+    """A client that vanished mid-body: answer plainly, never a 500 traceback."""
+    return JSONResponse({"detail": "client closed the connection"}, status_code=400)
+
+
 def create_app(config: Settings | None = None) -> FastAPI:
     cfg = config or settings
+    # A client resetting during accept must not leave the listener closed.
+    install_accept_resilience()
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
+        # A browser closing a tab must not print a traceback; real errors still do.
+        install_quiet_disconnects(asyncio.get_running_loop())
         init_db(cfg)
         cfg.ensure_token()
         cfg.save()
@@ -80,6 +92,7 @@ def create_app(config: Settings | None = None) -> FastAPI:
         max_age=600,
     )
 
+    app.add_exception_handler(ClientDisconnect, client_closed)
     app.include_router(router)
 
     @app.get("/pair", include_in_schema=False)
