@@ -14,6 +14,7 @@ import {
 import { db } from '../storage/db';
 import { getDeviceId } from '../storage/repo';
 import {
+  adoptServedServer,
   loadSyncConfig,
   refreshCounters,
   resolveConflict,
@@ -22,6 +23,7 @@ import {
   testConnection,
 } from '../sync/engine';
 import { SyncClient, pairWithCode } from '../sync/client';
+import { isServedByThoth } from '../sync/discovery';
 import type { ServerStatus } from '../sync/protocol';
 import { syncStatus } from '../sync/store';
 import { relativeTime } from '../lib/format';
@@ -72,6 +74,7 @@ export function SyncScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const [probe, setProbe] = useState<{ ok: boolean; message: string } | null>(null);
   const [checking, setChecking] = useState(false);
+  const [servedBy, setServedBy] = useState<string | null>(null);
   const started = useRef(false);
 
   const status = useSyncExternalStore(syncStatus.subscribe, syncStatus.getSnapshot);
@@ -106,7 +109,16 @@ export function SyncScreen() {
         history.replaceState(null, '', `${window.location.pathname}${window.location.search}#/sync`);
       }
 
-      const config = await loadSyncConfig();
+      let config = await loadSyncConfig();
+      // Cheap after the first call: the answer is cached for this page.
+      const adoption = await adoptServedServer();
+      if (adoption) {
+        config = await loadSyncConfig();
+        setServedBy(adoption.detected.deviceName);
+        if (adoption.state === 'paired') {
+          setNotice('This laptop is serving the app, so it paired automatically. Nothing to type.');
+        }
+      }
       setServerUrl(linkServer || config.serverUrl);
       setCode(linkCode);
       setToken(config.token);
@@ -258,8 +270,8 @@ export function SyncScreen() {
     }
   }
 
-  const sameOrigin = typeof window !== 'undefined' && window.location.protocol === 'https:' &&
-    !/github\.io$/.test(window.location.hostname);
+  // Only offered once the page proved it is served by a Thoth backend.
+  const sameOrigin = servedBy !== null && isServedByThoth();
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -398,7 +410,7 @@ export function SyncScreen() {
             <div className="mt-4 space-y-3">
               <Field
                 label="Laptop address"
-                hint="Printed in the server window. Scanning the QR code on the laptop's pairing page fills this in for you."
+                hint="Filled in by itself when you open the app from the laptop; the QR code does the same on the iPad."
               >
                 <TextInput
                   value={serverUrl}

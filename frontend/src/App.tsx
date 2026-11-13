@@ -8,7 +8,7 @@ import { SettingsScreen } from './components/SettingsScreen';
 import { SyncScreen } from './components/SyncScreen';
 import { BackupScreen } from './components/BackupScreen';
 import { getDeviceId, getSettings, saveSettings } from './storage/repo';
-import { refreshCounters, startAutoSync, loadSyncConfig } from './sync/engine';
+import { adoptServedServer, refreshCounters, startAutoSync, loadSyncConfig } from './sync/engine';
 import { syncStatus } from './sync/store';
 import { UpdatePrompt } from './components/UpdatePrompt';
 import { applyTheme, cachedTheme, watchSystemTheme, type ThemeName } from './lib/theme';
@@ -28,6 +28,8 @@ export function App() {
         applyTheme((settings.theme as ThemeName) ?? cachedTheme());
         stopWatching = watchSystemTheme();
         await loadSyncConfig();
+        // Served by the laptop's own backend? Then that machine is the destination.
+        await adoptServedServer();
         if (navigator.storage?.persist) {
           const already = await navigator.storage.persisted();
           if (!already) await navigator.storage.persist();

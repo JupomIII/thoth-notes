@@ -10,7 +10,8 @@ import {
   readEntity,
   setSyncState,
 } from '../storage/repo';
-import { SyncClient, SyncError, normalizeServerUrl } from './client';
+import { SyncClient, SyncError, normalizeServerUrl, pairWithCode } from './client';
+import { detectLocalServer, detectPairingCode, planAdoption, type DetectedServer } from './discovery';
 import { MAX_BATCH } from './protocol';
 import { syncStatus } from './store';
 import { now } from '../lib/id';
@@ -92,6 +93,59 @@ export async function testConnection(
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Connection failed';
     return { ok: false, message };
+  }
+}
+
+export interface AdoptionResult {
+  state: 'paired' | 'connected';
+  detected: DetectedServer;
+}
+
+let adopting: Promise<AdoptionResult | null> | null = null;
+/** The page origin cannot change without a reload, so one answer serves all screens. */
+let adopted: AdoptionResult | null | undefined;
+
+/**
+ * A page served by the laptop's own backend already belongs to a machine, so it
+ * adopts that origin instead of asking for an address. When the laptop is the
+ * one asking, it can also read its own pairing page and pair with no typing.
+ * Pages served from GitHub cannot discover anything: there it returns null.
+ */
+export function adoptServedServer(): Promise<AdoptionResult | null> {
+  if (adopted !== undefined) return Promise.resolve(adopted);
+  adopting ??= runAdoption()
+    .then((result) => {
+      adopted = result;
+      return result;
+    })
+    .finally(() => {
+      adopting = null;
+    });
+  return adopting;
+}
+
+async function runAdoption(): Promise<AdoptionResult | null> {
+  const config = await loadSyncConfig();
+  const detected = await detectLocalServer();
+  if (!detected) return null;
+  const code = config.token.trim() ? null : await detectPairingCode();
+  const plan = planAdoption(config, detected, code);
+  if (plan.kind === 'none') return { state: 'connected', detected };
+  if (plan.kind === 'repoint') {
+    await saveSyncConfig({ serverUrl: plan.serverUrl });
+    return { state: 'connected', detected };
+  }
+  try {
+    const deviceId = await getDeviceId();
+    const result = await pairWithCode(plan.serverUrl, plan.code, `Laptop ${deviceId.slice(0, 4)}`);
+    // Stay on the address the page was served from, not the LAN one the server
+    // reports: same-origin requests need no CORS entry and survive an IP change.
+    await saveSyncConfig({ serverUrl: plan.serverUrl, token: result.token });
+    return { state: 'paired', detected };
+  } catch {
+    // Keep the address even if pairing is refused: the form is then filled in.
+    await saveSyncConfig({ serverUrl: plan.serverUrl });
+    return { state: 'connected', detected };
   }
 }
 

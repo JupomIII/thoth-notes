@@ -189,6 +189,7 @@ def run() -> None:
     print(f"  LAN IP         : {local_ip()}:{cfg.port}")
     print(f"  Pairing code   : {pairing.current_code(cfg)}   (changes every {cfg.pair_code_minutes} min)")
     print(f"  Pairing page   : {scheme}://localhost:{cfg.port}/pair   (open on the laptop)")
+    print(f"  App on laptop  : {scheme}://localhost:{cfg.port}/        (same app, pairs itself)")
     print("  Token          : stored locally in storage\\pairing-token.txt, never printed")
     print()
     if cfg.tunneled:
