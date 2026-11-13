@@ -52,7 +52,7 @@ frontend/        React PWA (see docs/ARCHITECTURE.md)
 backend/         FastAPI server, tests, storage (gitignored)
 shared/schemas/  JSON Schema for the sync envelope
 scripts/         PowerShell install / start / backup / firewall helpers
-docs/            Architecture, iPad setup, sync protocol, testing
+docs/            Architecture, iPad setup, sync protocol, testing, HTTP feasibility
 deploy           .github/workflows/deploy.yml → GitHub Pages
 ```
 
