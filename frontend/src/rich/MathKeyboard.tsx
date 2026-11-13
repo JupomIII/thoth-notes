@@ -199,13 +199,13 @@ export function MathKeyboard({ onInsert }: { onInsert: (latex: string) => void }
             type="button"
             title={key.title ?? key.latex}
             aria-label={key.title ?? key.latex}
-            onClick={() => onInsert(key.latex.replace(/#@/g, '\placeholder{}'))}
+            onClick={() => onInsert(key.latex.replace(/#@/g, '\\placeholder{}'))}
             className={cx(
               'flex h-11 items-center justify-center rounded-md border border-line bg-paper text-ink transition-colors hover:border-line-strong hover:bg-paper-sunken',
               key.wide && 'col-span-2',
             )}
           >
-            <MathView latex={key.latex.replace(/#@/g, '\Box')} size={15} display={false} />
+            <MathView latex={key.latex.replace(/#@/g, '\\Box')} size={15} display={false} />
           </button>
         ))}
       </div>
