@@ -84,9 +84,10 @@ export function brushConfig(tool: DrawToolId, width: number, points: StrokePoint
 }
 
 export const BRUSH_TOOLS: DrawToolId[] = ['fountain', 'ballpoint', 'pencil', 'highlighter'];
-export const SHAPE_TOOLS: DrawToolId[] = ['line', 'rect', 'circle', 'arrow'];
+export const SHAPE_TOOLS: DrawToolId[] = ['line', 'rect', 'circle', 'ellipse', 'triangle', 'arrow'];
 
 export const TOOL_LABELS: Record<DrawToolId, string> = {
+  select: 'Select',
   fountain: 'Fountain pen',
   ballpoint: 'Ballpoint',
   pencil: 'Pencil',
@@ -98,5 +99,7 @@ export const TOOL_LABELS: Record<DrawToolId, string> = {
   line: 'Line',
   rect: 'Rectangle',
   circle: 'Circle',
+  ellipse: 'Ellipse',
+  triangle: 'Triangle',
   arrow: 'Arrow',
 };

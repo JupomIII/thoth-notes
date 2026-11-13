@@ -3,7 +3,9 @@ import { db } from './db';
 import type {
   AppSettings,
   Envelope,
+  EquationPlacement,
   Folder,
+  GraphObject,
   ImagePlacement,
   Notebook,
   Page,
@@ -11,6 +13,7 @@ import type {
   Stroke,
   SyncKind,
   SyncRecord,
+  TableObject,
   TextBlock,
 } from './types';
 import { DEFAULT_TOOL_SETTINGS, PAGE_SIZES } from './types';
@@ -33,6 +36,12 @@ function tableFor(kind: SyncKind): EntityTable {
       return db.texts as unknown as EntityTable;
     case 'image':
       return db.images as unknown as EntityTable;
+    case 'equation':
+      return db.equations as unknown as EntityTable;
+    case 'graph':
+      return db.graphs as unknown as EntityTable;
+    case 'table':
+      return db.tableObjects as unknown as EntityTable;
     case 'asset':
       return db.assets as unknown as EntityTable;
   }
@@ -57,6 +66,12 @@ const DEFAULT_SETTINGS: AppSettings = {
   serverUrl: '',
   autoSync: true,
   eraserMode: 'stroke',
+  theme: 'system',
+  recentColors: [],
+  gridSpacing: 36,
+  snapEnabled: false,
+  recognizeShapes: true,
+  lastTool: 'fountain',
 };
 
 export async function getSettings(): Promise<AppSettings> {
@@ -98,6 +113,9 @@ function kindOfEntity(entity: Envelope): SyncKind {
   if ('pageId' in entity) {
     if ('points' in entity) return 'stroke';
     if ('text' in entity) return 'text';
+    if ('latex' in entity) return 'equation';
+    if ('functions' in entity) return 'graph';
+    if ('cells' in entity) return 'table';
     return 'image';
   }
   if ('parentId' in entity) return 'folder';
@@ -179,7 +197,9 @@ export async function updateFolder(id: string, patch: Partial<Folder>): Promise<
 
 export async function createPage(
   notebookId: string,
-  input: Partial<Pick<Page, 'template' | 'size' | 'index' | 'pdfAssetId' | 'pdfPageIndex' | 'title'>>,
+  input: Partial<
+    Pick<Page, 'template' | 'size' | 'index' | 'pdfAssetId' | 'pdfPageIndex' | 'title' | 'gridSpacing'>
+  >,
 ): Promise<Page> {
   const env = await baseEnvelope();
   const size = input.size ?? 'a4';
@@ -189,6 +209,7 @@ export async function createPage(
     const existing = await db.pages.where('notebookId').equals(notebookId).toArray();
     index = existing.filter((p) => p.deletedAt === null).length;
   }
+  const prefs = await getSettings();
   const page: Page = {
     ...env,
     notebookId,
@@ -201,6 +222,7 @@ export async function createPage(
     pdfAssetId: input.pdfAssetId ?? null,
     pdfPageIndex: input.pdfPageIndex ?? 0,
     backgroundTint: null,
+    gridSpacing: input.gridSpacing ?? prefs.gridSpacing ?? 36,
   };
   await db.pages.put(page);
   await markOutbox('page', page.id);
@@ -252,6 +274,7 @@ export async function duplicatePage(pageId: string): Promise<Page | null> {
     await markOutbox('image', clone.id);
   }
   const thumb = await db.thumbnails.get(pageId);
+  await cloneRichToPage(pageId, copy.id);
   if (thumb) await db.thumbnails.put({ ...thumb, pageId: copy.id, updatedAt: now() });
   return copy;
 }
@@ -300,6 +323,7 @@ export async function duplicateNotebook(notebookId: string): Promise<Notebook | 
       await db.images.put(clone);
       await markOutbox('image', clone.id);
     }
+    await cloneRichToPage(page.id, newPage.id);
   }
   return copy;
 }
@@ -361,6 +385,17 @@ export async function softDeleteEntity(
       if (x.deletedAt !== null) continue;
       await softDeleteEntity('image', x.id, false);
     }
+    const richGroups: { kind: RichKind; rows: AnyEntity[] }[] = [
+      { kind: 'equation', rows: (await db.equations.where('pageId').equals(id).toArray()) as unknown as AnyEntity[] },
+      { kind: 'graph', rows: (await db.graphs.where('pageId').equals(id).toArray()) as unknown as AnyEntity[] },
+      { kind: 'table', rows: (await db.tableObjects.where('pageId').equals(id).toArray()) as unknown as AnyEntity[] },
+    ];
+    for (const group of richGroups) {
+      for (const row of group.rows) {
+        if (row.deletedAt !== null) continue;
+        await softDeleteEntity(group.kind, row.id, false);
+      }
+    }
     await db.drafts.delete(id);
     await db.thumbnails.delete(id);
   }
@@ -404,11 +439,17 @@ export async function loadPageContent(pageId: string): Promise<{
   strokes: Stroke[];
   texts: TextBlock[];
   images: ImagePlacement[];
+  equations: EquationPlacement[];
+  graphs: GraphObject[];
+  tables: TableObject[];
 }> {
-  const [strokes, texts, images] = await Promise.all([
+  const [strokes, texts, images, equations, graphs, tables] = await Promise.all([
     db.strokes.where('pageId').equals(pageId).toArray(),
     db.texts.where('pageId').equals(pageId).toArray(),
     db.images.where('pageId').equals(pageId).toArray(),
+    db.equations.where('pageId').equals(pageId).toArray(),
+    db.graphs.where('pageId').equals(pageId).toArray(),
+    db.tableObjects.where('pageId').equals(pageId).toArray(),
   ]);
   return {
     strokes: strokes
@@ -416,7 +457,55 @@ export async function loadPageContent(pageId: string): Promise<{
       .sort((a, b) => a.createdAt - b.createdAt),
     texts: texts.filter((t) => t.deletedAt === null),
     images: images.filter((i) => i.deletedAt === null),
+    equations: equations.filter((e) => e.deletedAt === null),
+    graphs: graphs.filter((g) => g.deletedAt === null),
+    tables: tables.filter((t) => t.deletedAt === null),
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Rich page objects (equations, graphs, tables)                       */
+/* ------------------------------------------------------------------ */
+
+export type RichKind = 'equation' | 'graph' | 'table';
+
+/** Writes a rich object, bumping the version so the change syncs. */
+export async function saveRich<T extends Envelope>(kind: RichKind, entity: T): Promise<T> {
+  const existing = (await tableFor(kind).get(entity.id)) as T | undefined;
+  const next = {
+    ...entity,
+    updatedAt: now(),
+    version: existing ? Math.max(existing.version, entity.version) + 1 : Math.max(1, entity.version),
+  } as T;
+  await tableFor(kind).put(next as unknown as AnyEntity);
+  await markOutbox(kind, next.id);
+  return next;
+}
+
+export async function removeRich(kind: RichKind, id: string): Promise<void> {
+  await softDeleteEntity(kind, id, false);
+}
+
+export async function newRichEnvelope(): Promise<Envelope> {
+  return baseEnvelope();
+}
+
+/** Copies every rich object from one page to another (duplicate page or notebook). */
+async function cloneRichToPage(fromPageId: string, toPageId: string): Promise<void> {
+  const groups: { kind: RichKind; rows: AnyEntity[] }[] = [
+    { kind: 'equation', rows: (await db.equations.where('pageId').equals(fromPageId).toArray()) as unknown as AnyEntity[] },
+    { kind: 'graph', rows: (await db.graphs.where('pageId').equals(fromPageId).toArray()) as unknown as AnyEntity[] },
+    { kind: 'table', rows: (await db.tableObjects.where('pageId').equals(fromPageId).toArray()) as unknown as AnyEntity[] },
+  ];
+  for (const group of groups) {
+    for (const row of group.rows) {
+      if (row.deletedAt !== null) continue;
+      const env = await baseEnvelope();
+      const clone = { ...row, ...env, pageId: toPageId } as AnyEntity;
+      await tableFor(group.kind).put(clone);
+      await markOutbox(group.kind, clone.id);
+    }
+  }
 }
 
 export async function getAssetBlob(assetId: string): Promise<Blob | null> {

@@ -5,26 +5,26 @@ export default {
     extend: {
       colors: {
         paper: {
-          DEFAULT: '#faf8f4',
-          raised: '#fffdfa',
-          sunken: '#f2eee7',
+          DEFAULT: 'rgb(var(--paper) / <alpha-value>)',
+          raised: 'rgb(var(--paper-raised) / <alpha-value>)',
+          sunken: 'rgb(var(--paper-sunken) / <alpha-value>)',
         },
         ink: {
-          DEFAULT: '#1f1d1a',
-          soft: '#4a463f',
-          muted: '#7c766b',
-          faint: '#a8a196',
+          DEFAULT: 'rgb(var(--ink) / <alpha-value>)',
+          soft: 'rgb(var(--ink-soft) / <alpha-value>)',
+          muted: 'rgb(var(--ink-muted) / <alpha-value>)',
+          faint: 'rgb(var(--ink-faint) / <alpha-value>)',
         },
         line: {
-          DEFAULT: '#e2dcf0',
-          strong: '#d3ccbe',
+          DEFAULT: 'rgb(var(--line) / <alpha-value>)',
+          strong: 'rgb(var(--line-strong) / <alpha-value>)',
         },
         accent: {
-          DEFAULT: '#4a6156',
-          soft: '#e7ede9',
-          strong: '#364a41',
+          DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
+          soft: 'rgb(var(--accent-soft) / <alpha-value>)',
+          strong: 'rgb(var(--accent-strong) / <alpha-value>)',
         },
-        danger: '#9b4b3f',
+        danger: 'rgb(var(--danger) / <alpha-value>)',
       },
       fontFamily: {
         ui: [

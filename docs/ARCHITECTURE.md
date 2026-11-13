@@ -21,7 +21,7 @@ src/
     renderPage.ts off-screen renderer used by export + thumbnails
     textRender.ts shared text wrapping for canvas and exports
   storage/
-    db.ts         Dexie schema + versioned migrations (v1 → v3)
+    db.ts         Dexie schema + versioned migrations (v1 → v4)
     repo.ts       record helpers, tombstones, cascades
     pageStore.ts  buffered write-behind persistence adapter
     backup.ts     ZIP export/import with checksums
@@ -29,8 +29,31 @@ src/
   sync/           protocol types, HTTP client, orchestration, status store
   pdf/            pdf.js loader + page rasteriser
   export/         PNG and PDF writers, PDF import
-  lib/            ids, geometry, hashing, formatting
+  lib/            ids, geometry, hashing, formatting, theme
+  rich/           equation objects: LaTeX typesetter, KaTeX view, symbol
+                  keyboard, editor panel, overlay layer, table painter
+  graph/          expression compilation, sampling, analysis, canvas plot,
+                  graph editor panel
+  tools/          scientific calculator and unit converter panel
 ```
+
+**Rich objects.** Equations, graphs and tables are page-scoped records
+(`equations`, `graphs`, `tableObjects`) rendered into a DOM overlay that follows
+the engine's view transform, so text and formulas stay crisp at any zoom and
+remain editable. The same objects are painted into the ink canvas path used by
+thumbnails, PNG export and PDF pages, which is why exports look like the page.
+Dragging and resizing happen in the overlay; the underlying record is updated
+once on pointer-up.
+
+**Math without `eval`.** Expressions are normalised (LaTeX decorations, `f(x)=`
+prefixes, `piecewise(...)`) and compiled by the `mathjs/number` build with an `x`
+scope. Numerical analysis (roots, extrema, intersections, derivative, tangent)
+samples the compiled function; nothing from the input is ever executed as code.
+
+**Loading strategy.** MathLive, KaTeX, mathjs and pdf-lib are dynamic imports, so
+the initial bundle carries only the drawing app. Each waits for its chunk before
+rendering: graph canvases and the analysis panel repaint when the engine reports
+ready, and every export awaits both the parser and the typesetter first.
 
 **Layers.** Three stacked canvases: paper (grid/lines/PDF page), ink (committed
 content), live (in-flight stroke, lasso trail, selection box). Panning redraws

@@ -7,7 +7,8 @@ import { getDeviceId, getSettings, saveSettings } from '../storage/repo';
 import { loadSyncConfig, refreshCounters } from '../sync/engine';
 import { formatBytes } from '../lib/download';
 import { navigate } from '../app/router';
-import { Button, ScreenHeader, Toggle, cx } from './ui';
+import { Button, ScreenHeader, Segmented, TextInput, Toggle, cx } from './ui';
+import { applyTheme, type ThemeName } from '../lib/theme';
 
 export function SettingsScreen() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -45,6 +46,7 @@ export function SettingsScreen() {
   async function update(patch: Partial<AppSettings>): Promise<void> {
     const next = await saveSettings(patch);
     setSettings(next);
+    if (patch.theme) applyTheme(patch.theme as ThemeName);
   }
 
   async function requestPersistence(): Promise<void> {
@@ -73,6 +75,24 @@ export function SettingsScreen() {
         )}
 
         <section className="rounded-xl border border-line bg-paper-raised p-4">
+          <h2 className="font-serif text-[17px] text-ink">Appearance</h2>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <Segmented
+              options={[
+                { value: 'system', label: 'System' },
+                { value: 'light', label: 'Light' },
+                { value: 'dark', label: 'Dark' },
+              ]}
+              value={settings?.theme ?? 'system'}
+              onChange={(value) => void update({ theme: value })}
+            />
+            <span className="text-[12px] text-ink-muted">
+              Paper stays white so exported pages print as written.
+            </span>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-line bg-paper-raised p-4">
           <h2 className="font-serif text-[17px] text-ink">Writing</h2>
           <div className="mt-1 divide-y divide-line">
             <Toggle
@@ -93,6 +113,37 @@ export function SettingsScreen() {
               label="Show page boundary"
               description="Draws a hairline around the sheet; turn off for a borderless page."
             />
+            <Toggle
+              checked={settings?.snapEnabled ?? false}
+              onChange={(value) => void update({ snapEnabled: value })}
+              label="Snap geometry tools"
+              description="Shapes snap to the grid and lines snap to 15° steps."
+            />
+            <Toggle
+              checked={settings?.recognizeShapes ?? true}
+              onChange={(value) => void update({ recognizeShapes: value })}
+              label="Suggest clean shapes"
+              description="After a freehand circle, line or rectangle the page offers to replace it. Ink is never changed without your tap."
+            />
+            <div className="flex flex-wrap items-end justify-between gap-3 py-3">
+              <div>
+                <div className="text-[15px] text-ink">Grid spacing</div>
+                <div className="mt-0.5 text-[12.5px] text-ink-muted">
+                  Default spacing for new grid, graph and engineering pages.
+                </div>
+              </div>
+              <div className="w-24">
+                <TextInput
+                  value={String(settings?.gridSpacing ?? 36)}
+                  inputMode="numeric"
+                  className="h-9 text-[13px]"
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    if (Number.isFinite(value) && value >= 8 && value <= 200) void update({ gridSpacing: Math.round(value) });
+                  }}
+                />
+              </div>
+            </div>
           </div>
         </section>
 

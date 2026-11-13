@@ -278,6 +278,12 @@ function tableForKind(kind: SyncKind) {
       return db.texts;
     case 'image':
       return db.images;
+    case 'equation':
+      return db.equations;
+    case 'graph':
+      return db.graphs;
+    case 'table':
+      return db.tableObjects;
     case 'asset':
       return db.assets;
   }
@@ -291,6 +297,9 @@ function describeRecord(kind: SyncKind, data: unknown): string {
   if (kind === 'stroke') return `Stroke (${entity.tool ?? 'ink'})`;
   if (kind === 'text') return 'Text block';
   if (kind === 'image') return 'Image placement';
+  if (kind === 'equation') return 'Equation';
+  if (kind === 'graph') return entity.title || 'Graph';
+  if (kind === 'table') return 'Table';
   return 'Attachment';
 }
 

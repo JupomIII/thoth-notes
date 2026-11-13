@@ -1,11 +1,14 @@
 import Dexie, { type Table } from 'dexie';
 import type {
+  EquationPlacement,
   Folder,
+  GraphObject,
   ImagePlacement,
   Notebook,
   Page,
   StoredAsset,
   Stroke,
+  TableObject,
   TextBlock,
 } from './types';
 
@@ -60,6 +63,9 @@ export class ThothDatabase extends Dexie {
   strokes!: Table<Stroke, string>;
   texts!: Table<TextBlock, string>;
   images!: Table<ImagePlacement, string>;
+  equations!: Table<EquationPlacement, string>;
+  graphs!: Table<GraphObject, string>;
+  tableObjects!: Table<TableObject, string>;
   assets!: Table<StoredAsset, string>;
   outbox!: Table<OutboxEntry, number>;
   syncState!: Table<SyncStateRow, string>;
@@ -91,6 +97,13 @@ export class ThothDatabase extends Dexie {
     // v3: page thumbnails are device-local so they never bloat sync payloads.
     this.version(3).stores({
       thumbnails: 'pageId, updatedAt',
+    });
+    // v4: rich page objects (equations, graphs, tables) are first-class synced
+    // records, so they survive refreshes, reach Windows and land in backups.
+    this.version(4).stores({
+      equations: 'id, pageId, updatedAt, deletedAt',
+      graphs: 'id, pageId, updatedAt, deletedAt',
+      tableObjects: 'id, pageId, updatedAt, deletedAt',
     });
   }
 }

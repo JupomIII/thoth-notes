@@ -3,16 +3,19 @@ import {
   ArrowUpRight,
   ChevronDown,
   Circle,
+  CircleDashed,
   Eraser,
   GripHorizontal,
   Highlighter,
   Image as ImageIcon,
   Lasso,
   Minus,
+  MousePointer2,
   Pencil,
   PenTool,
   Redo2,
   Square,
+  Triangle,
   Trash2,
   Type,
   Undo2,
@@ -25,6 +28,7 @@ import { IconButton, cx } from './ui';
 const COLORS = ['#1f1d1a', '#23324a', '#4a6156', '#7d3f3f', '#b08a3e', '#6a4a62'];
 
 const TOOLS: { id: DrawToolId; label: string; icon: typeof PenTool }[] = [
+  { id: 'select', label: 'Select objects', icon: MousePointer2 },
   { id: 'fountain', label: 'Fountain pen', icon: PenTool },
   { id: 'ballpoint', label: 'Ballpoint pen', icon: PenTool },
   { id: 'pencil', label: 'Pencil', icon: Pencil },
@@ -39,6 +43,8 @@ const SHAPES: { id: DrawToolId; label: string; icon: typeof Minus }[] = [
   { id: 'line', label: 'Straight line', icon: Minus },
   { id: 'rect', label: 'Rectangle', icon: Square },
   { id: 'circle', label: 'Circle', icon: Circle },
+  { id: 'ellipse', label: 'Ellipse', icon: CircleDashed },
+  { id: 'triangle', label: 'Triangle', icon: Triangle },
   { id: 'arrow', label: 'Arrow', icon: ArrowUpRight },
 ];
 

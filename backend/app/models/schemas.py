@@ -7,7 +7,18 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-SyncKind = Literal["folder", "notebook", "page", "stroke", "text", "image", "asset"]
+SyncKind = Literal[
+    "folder",
+    "notebook",
+    "page",
+    "stroke",
+    "text",
+    "image",
+    "equation",
+    "graph",
+    "table",
+    "asset",
+]
 SYNC_KINDS: tuple[str, ...] = (
     "folder",
     "notebook",
@@ -15,6 +26,9 @@ SYNC_KINDS: tuple[str, ...] = (
     "stroke",
     "text",
     "image",
+    "equation",
+    "graph",
+    "table",
     "asset",
 )
 

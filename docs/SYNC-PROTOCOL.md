@@ -17,7 +17,14 @@ attachment, wrapped in the same envelope on both sides.
 }
 ```
 
-Kinds: `folder`, `notebook`, `page`, `stroke`, `text`, `image`, `asset`.
+Kinds: `folder`, `notebook`, `page`, `stroke`, `text`, `image`, `asset`,
+`equation`, `graph`, `table`.
+
+The last three carry the live objects inserted on a page: the LaTeX source of an
+equation, the full configuration (expressions, ranges, colours, points) of a
+graph, and the cells and column widths of a table. They are ordinary records, so
+they use the same envelope, cursor, merge rule and tombstone handling as strokes;
+the server stores their JSON unchanged and includes them in every backup.
 The JSON Schema lives in `shared/schemas/sync.schema.json`.
 
 ## Endpoints

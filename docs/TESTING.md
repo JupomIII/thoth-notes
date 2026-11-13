@@ -11,7 +11,7 @@ checks are listed as such.
 ```
 cd frontend
 npx tsc -b            # strict TypeScript, no errors
-npx vitest run        # 2 files, 9 tests, all passing
+npx vitest run        # 3 files, 19 tests, all passing
 npm run build         # vite build + PWA generateSW, success
 ```
 
@@ -20,9 +20,12 @@ npm run build         # vite build + PWA generateSW, success
 * Unit tests cover: stroke bounds, point-to-segment distance, lasso polygon
   containment, Douglas–Peucker simplification, anchored zoom maths and zoom
   clamping; partial-erase splitting (two surviving runs, fully erased stroke,
-  long wavy stroke).
-* The production build precaches 16 files (~2.5 MB) including the PDF.js worker,
-  and emits `sw.js` + `manifest.webmanifest`.
+  long wavy stroke); expression normalisation, polynomial/trigonometric/piecewise
+  evaluation, syntax errors, out-of-domain values, roots, intersections, extrema
+  and the numerical derivative.
+* The production build precaches 40 files (~4.3 MB) including the PDF.js worker,
+  and emits `sw.js` + `manifest.webmanifest`. Main bundle is 258 kB gzipped;
+  MathLive, KaTeX, mathjs and pdf-lib are separate chunks loaded on demand.
 
 ### Backend
 
@@ -31,7 +34,7 @@ cd backend
 python -m venv .venv
 ./.venv/Scripts/python.exe -m pip install -r requirements.txt
 ./.venv/Scripts/python.exe -m pytest -q
-# 12 passed
+# 23 passed
 ```
 
 Coverage of the executed tests:
@@ -112,3 +115,38 @@ visible rectangle, but **no frame-rate claim is made**: this build was not
 profiled on iPad hardware. If a specific page feels slow, the useful measurements
 are point counts per stroke, stroke count per page, and whether the PDF layer is
 being re-rasterised during input (it is debounced to 220 ms after a zoom settles).
+
+## This build — academic tools (executed in Chromium, dev server)
+
+| Check | Result |
+| --- | --- |
+| Equation inserted from the editor | Object appears on the page, rendered with KaTeX, action bar offers Edit/Duplicate/Copy/Delete |
+| Equation survives a reload | Reloaded page shows the same equation object with its KaTeX rendering and stored LaTeX |
+| Symbol keyboard categories | Basic/Greek/Calculus/Algebra/Trigonometry/Linear algebra/Matrices render real KaTeX previews |
+| Graph inserted and reopened | Two functions (x², sin x) plotted; reopening the object restores both expressions and redraws the curves |
+| Graph analysis | f(1) = 1.0000, f′(1) = 2.0000, tangent y = 2.00x − 1.00, root x = 0, minimum (0, 0), intersections (0.00, 0.00) and (0.88, 0.77) |
+| Scientific calculator | 2 + 3 × 4 = 14, history entry recorded, "As equation" opens the equation editor prefilled with `2+3 	imes 4 = 14` |
+| Unit converter | Length category defaults to 1 mm = 0.1000 cm; categories and precision controls present |
+| Table inserted | 3 × 3 table object with nine cells on the page, editable through the table editor |
+| Theme switching | Light and dark tokens swap on the document root; dark chrome background `rgb(24,23,21)`, light `rgb(250,248,244)` |
+| PDF export | Ran to completion with no console errors after loading pdf-lib and the typesetter |
+| Console | No errors or failed requests during the session; only Vite HMR and a Canvas2D `getImageData` advisory |
+
+Not executed: the sync/backup round trip for the three new kinds against a
+running Windows server (record shapes and backend kinds were checked instead),
+and every hardware check below.
+
+### Extra manual checks for the new tools on iPad
+
+1. Open the equation editor, type with the on-screen MathLive keyboard and with
+   the hardware keyboard; confirm the caret behaves with an Apple Pencil tapped
+   into the field.
+2. Drag and resize an equation and a graph with a finger; confirm they land where
+   the finger lifted at 50 % and 200 % zoom.
+3. Graph panel: pan inside the preview with one finger, pinch to zoom, confirm the
+   handwriting layer behind is unaffected after closing the panel.
+4. Calculator and converter sheets: confirm the numeric keypad does not obscure
+   the result field when the software keyboard is open.
+5. Export a notebook containing an equation, a graph and a table to PDF and check
+   the printed sizes against the page.
+

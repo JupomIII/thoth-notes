@@ -10,6 +10,8 @@ export interface PaperOptions {
   tint: string | null;
   infinite: boolean;
   showBoundary: boolean;
+  /** Base spacing for grid paper, in document pixels. */
+  gridSpacing?: number;
 }
 
 const PAPER_FILL = '#fffdf9';
@@ -27,6 +29,7 @@ function hairline(scale: number): number {
  */
 export function drawPaper(ctx: CanvasRenderingContext2D, opts: PaperOptions): void {
   const { template, width, height, scale, tint, infinite, showBoundary } = opts;
+  const spacing = Math.max(8, Math.round(opts.gridSpacing ?? 36));
   ctx.save();
   ctx.lineCap = 'butt';
 
@@ -73,7 +76,7 @@ export function drawPaper(ctx: CanvasRenderingContext2D, opts: PaperOptions): vo
       break;
     }
     case 'grid': {
-      const gap = 36;
+      const gap = spacing;
       ctx.strokeStyle = RULE;
       ctx.beginPath();
       for (let x = gap; x < width; x += gap) {
@@ -88,7 +91,7 @@ export function drawPaper(ctx: CanvasRenderingContext2D, opts: PaperOptions): vo
       break;
     }
     case 'dots': {
-      const gap = 36;
+      const gap = spacing;
       ctx.fillStyle = RULE_STRONG;
       for (let x = gap; x < width; x += gap) {
         for (let y = gap; y < height; y += gap) {
@@ -100,8 +103,8 @@ export function drawPaper(ctx: CanvasRenderingContext2D, opts: PaperOptions): vo
       break;
     }
     case 'graph': {
-      const small = 18;
-      const large = 90;
+      const small = Math.max(12, Math.round(spacing / 2));
+      const large = spacing * 2.5;
       ctx.strokeStyle = '#e7e2d8';
       ctx.beginPath();
       for (let x = small; x < width; x += small) {
@@ -137,6 +140,43 @@ export function drawPaper(ctx: CanvasRenderingContext2D, opts: PaperOptions): vo
         ctx.moveTo(i * step, 0);
         ctx.lineTo(i * step - height * 0.577, height);
       }
+      ctx.stroke();
+      break;
+    }
+    case 'engineering': {
+      // Fine engineering paper: light 5 mm grid, heavy every fifth division,
+      // plus a faint axis pair through the middle of the sheet.
+      const fine = Math.max(10, Math.round(spacing / 2));
+      const heavy = fine * 5;
+      ctx.strokeStyle = '#e9e4d9';
+      ctx.beginPath();
+      for (let x = fine; x < width; x += fine) {
+        ctx.moveTo(x + 0.5, 0);
+        ctx.lineTo(x + 0.5, height);
+      }
+      for (let y = fine; y < height; y += fine) {
+        ctx.moveTo(0, y + 0.5);
+        ctx.lineTo(width, y + 0.5);
+      }
+      ctx.stroke();
+      ctx.strokeStyle = '#cfc8b8';
+      ctx.beginPath();
+      for (let x = heavy; x < width; x += heavy) {
+        ctx.moveTo(x + 0.5, 0);
+        ctx.lineTo(x + 0.5, height);
+      }
+      for (let y = heavy; y < height; y += heavy) {
+        ctx.moveTo(0, y + 0.5);
+        ctx.lineTo(width, y + 0.5);
+      }
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(74, 97, 86, 0.32)';
+      ctx.lineWidth = hairline(scale) * 1.4;
+      ctx.beginPath();
+      ctx.moveTo(Math.round(width / 2) + 0.5, 0);
+      ctx.lineTo(Math.round(width / 2) + 0.5, height);
+      ctx.moveTo(0, Math.round(height / 2) + 0.5);
+      ctx.lineTo(width, Math.round(height / 2) + 0.5);
       ctx.stroke();
       break;
     }

@@ -1,5 +1,6 @@
 import type {
   DrawToolId,
+  ShapeKind,
   ImagePlacement,
   Page,
   Stroke,
@@ -13,13 +14,19 @@ import {
   boundsOfPoints,
   pointInPolygon,
   polylineDistance,
+  recognizeShape,
+  snapAngle,
+  snapToGrid,
   simplifyPoints,
   type Bounds,
+  type ShapeRecognition,
 } from '../lib/geometry';
 import { drawPaper } from './paper';
 import { drawStroke } from './strokeRender';
 import { paintText } from './textRender';
 import { HistoryStack } from './history';
+
+type ShapeToolId = 'line' | 'rect' | 'circle' | 'ellipse' | 'triangle' | 'arrow';
 
 export interface ViewTransform {
   scale: number;
@@ -68,6 +75,12 @@ export interface EngineCallbacks {
   onViewChange(view: ViewTransform): void;
   requestTextEdit(draft: TextDraft): void;
   requestImage(): void;
+  /** Fired after a freehand stroke that looks like a clean shape. */
+  onShapeSuggestion?(suggestion: ShapeSuggestion): void;
+}
+
+export interface ShapeSuggestion extends ShapeRecognition {
+  strokeId: string;
 }
 
 interface Mutation {
@@ -149,6 +162,9 @@ export class DrawingEngine {
   oneFingerPan = true;
   palmRejection = true;
   showBoundary = true;
+  recognizeShapes = true;
+  snapEnabled = false;
+  snapSize = 36;
 
   private strokes: Stroke[] = [];
   private texts: TextBlock[] = [];
@@ -466,6 +482,7 @@ export class DrawingEngine {
       tint: this.page.backgroundTint,
       infinite: this.page.size === 'infinite',
       showBoundary: this.showBoundary,
+      gridSpacing: this.page.gridSpacing,
     });
     const pdf = this.pdfBitmap;
     if (pdf && this.page.pdfAssetId) {
@@ -675,8 +692,14 @@ export class DrawingEngine {
       case 'line':
       case 'rect':
       case 'circle':
+      case 'ellipse':
+      case 'triangle':
       case 'arrow':
-        this.session = { kind: 'shape', start: point, current: point };
+        this.session = {
+          kind: 'shape',
+          start: this.snapShapePoint(point),
+          current: this.snapShapePoint(point),
+        };
         this.invalidateLive();
         break;
       case 'eraser':
@@ -769,7 +792,7 @@ export class DrawingEngine {
         break;
       }
       case 'shape': {
-        this.session.current = this.makePoint(e);
+        this.session.current = this.snapShapePoint(this.makePoint(e), this.session.start);
         this.invalidateLive();
         break;
       }
@@ -898,6 +921,15 @@ export class DrawingEngine {
             [{ ...stroke, points: simplifyPoints(stroke.points, 0.25), updatedAt: now() }],
             'Draw',
           );
+          if (
+            this.recognizeShapes &&
+            this.tool !== 'highlighter' &&
+            this.tool !== 'eraser' &&
+            this.callbacks.onShapeSuggestion
+          ) {
+            const suggestion = recognizeShape(stroke.points);
+            if (suggestion) this.callbacks.onShapeSuggestion({ ...suggestion, strokeId: stroke.id });
+          }
         } else if (stroke.points.length === 1 && !cancelled) {
           this.commitStrokes([stroke], 'Dot');
         }
@@ -909,7 +941,7 @@ export class DrawingEngine {
         this.session = { kind: 'none' };
         if (Math.hypot(current.x - start.x, current.y - start.y) > 2) {
           const settings =
-            this.toolSettings[this.tool as 'line' | 'rect' | 'circle' | 'arrow'] ?? this.toolSettings.line;
+            this.toolSettings[this.tool as ShapeToolId] ?? this.toolSettings.line;
           this.commitStrokes(
             [
               {
@@ -920,7 +952,7 @@ export class DrawingEngine {
                 width: settings.width,
                 opacity: settings.opacity,
                 points: [start, current],
-                shape: this.tool as 'line' | 'rect' | 'circle' | 'arrow',
+                shape: this.tool as ShapeKind,
                 createdAt: now(),
                 updatedAt: now(),
                 version: 1,
@@ -1580,6 +1612,45 @@ export class DrawingEngine {
     this.schedule();
   }
 
+  setRecognition(value: boolean): void {
+    this.recognizeShapes = value;
+  }
+
+  setSnapping(enabled: boolean, gridSize: number): void {
+    this.snapEnabled = enabled;
+    this.snapSize = gridSize;
+  }
+
+  /** Replaces a wobbly freehand stroke with the proposal the user accepted. */
+  applyShapeSuggestion(suggestion: ShapeSuggestion): void {
+    const before = this.strokes.find((stroke) => stroke.id === suggestion.strokeId);
+    if (!before) return;
+    const after: Stroke = {
+      ...before,
+      shape: suggestion.kind,
+      points: [suggestion.start, suggestion.end],
+      updatedAt: now(),
+      version: before.version + 1,
+    };
+    this.applyMutation({
+      label: 'Straighten stroke',
+      updatedStrokes: [{ before, after }],
+    });
+    this.invalidateInk();
+  }
+
+  private snapShapePoint(point: StrokePoint, start?: StrokePoint): StrokePoint {
+    if (!this.snapEnabled) return point;
+    const grid = snapToGrid(point.x, point.y, this.snapSize);
+    const snapped: StrokePoint = { ...point, x: grid.x, y: grid.y };
+    if (start && (this.tool === 'line' || this.tool === 'arrow')) {
+      const angled = snapAngle(start, snapped, 15);
+      snapped.x = angled.x;
+      snapped.y = angled.y;
+    }
+    return snapped;
+  }
+
   async undo(): Promise<void> {
     this.clearSelection();
     await this.history.undo();
@@ -1592,7 +1663,7 @@ export class DrawingEngine {
 
   private makeShapeStroke(start: StrokePoint, end: StrokePoint): Stroke {
     const settings =
-      this.toolSettings[this.tool as 'line' | 'rect' | 'circle' | 'arrow'] ?? this.toolSettings.line;
+      this.toolSettings[this.tool as ShapeToolId] ?? this.toolSettings.line;
     return {
       id: 'preview',
       pageId: this.page?.id ?? '',
@@ -1601,7 +1672,7 @@ export class DrawingEngine {
       width: settings.width,
       opacity: settings.opacity,
       points: [start, end],
-      shape: this.tool as 'line' | 'rect' | 'circle' | 'arrow',
+      shape: this.tool as ShapeKind,
       createdAt: 0,
       updatedAt: 0,
       version: 1,

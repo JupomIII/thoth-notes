@@ -1,10 +1,11 @@
-import { PDFDocument } from 'pdf-lib';
 import { db } from '../storage/db';
 import type { Page, StoredAsset } from '../storage/types';
 import { loadPageContent, activePages } from '../storage/repo';
 import { renderPage, canvasToPngBlob } from '../drawing/renderPage';
 import { loadPdf, renderPdfPage } from '../pdf/loader';
 import { downloadBlob, safeFilename } from '../lib/download';
+import { loadMathEngine } from '../graph/plot';
+import { loadTypesetter } from '../rich/mathTypeset';
 
 const PDF_PX_TO_PT = 72 / 150;
 
@@ -37,6 +38,7 @@ async function renderPdfAssetPage(page: Page, pixelRatio: number) {
 }
 
 export async function exportPagePng(page: Page, scale = 2): Promise<void> {
+  await Promise.all([loadMathEngine(), loadTypesetter()]);
   const content = await loadPageContent(page.id);
   const bitmaps = await assetBitmapsFor(page.id);
   const pdf = page.pdfAssetId ? await renderPdfAssetPage(page, 1.5) : null;
@@ -45,6 +47,9 @@ export async function exportPagePng(page: Page, scale = 2): Promise<void> {
     strokes: content.strokes,
     texts: content.texts,
     images: content.images,
+    equations: content.equations,
+    graphs: content.graphs,
+    tables: content.tables,
     assetBitmaps: bitmaps,
     pdfCanvas: pdf?.canvas ?? null,
     scale,
@@ -56,17 +61,29 @@ export async function exportPagePng(page: Page, scale = 2): Promise<void> {
   downloadBlob(blob, `${safeFilename(page.title || 'page')}.png`);
 }
 
+export interface PdfExportOptions {
+  /** Restricts the export to these pages, in this order. */
+  pageIds?: string[];
+}
+
 /**
  * Writes every page to a PDF. For annotated PDF pages the original page is
  * copied verbatim and the ink layer is drawn over it, so the source document
- * stays intact and searchable.
+ * stays intact and searchable. Equations, graphs and tables are rendered at
+ * 2x document resolution, which keeps them sharp when printed.
  */
 export async function exportNotebookPdf(
   notebookId: string,
   notebookTitle: string,
   onProgress?: (done: number, total: number) => void,
+  options: PdfExportOptions = {},
 ): Promise<void> {
-  const pages = await activePages(notebookId);
+  await Promise.all([loadMathEngine(), loadTypesetter()]);
+  const { PDFDocument } = await import('pdf-lib');
+  const all = await activePages(notebookId);
+  const pages = options.pageIds
+    ? options.pageIds.map((id) => all.find((page) => page.id === id)).filter((page): page is Page => Boolean(page))
+    : all;
   if (pages.length === 0) return;
   const out = await PDFDocument.create();
 
@@ -83,6 +100,9 @@ export async function exportNotebookPdf(
         strokes: content.strokes,
         texts: content.texts,
         images: content.images,
+        equations: content.equations,
+        graphs: content.graphs,
+        tables: content.tables,
         assetBitmaps: bitmaps,
         pdfCanvas: null,
         scale: 2,
@@ -106,6 +126,9 @@ export async function exportNotebookPdf(
         strokes: content.strokes,
         texts: content.texts,
         images: content.images,
+        equations: content.equations,
+        graphs: content.graphs,
+        tables: content.tables,
         assetBitmaps: bitmaps,
         pdfCanvas: null,
         scale: 2,

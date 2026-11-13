@@ -1,14 +1,27 @@
-import type { ImagePlacement, Page, Stroke, TextBlock } from '../storage/types';
+import type {
+  EquationPlacement,
+  GraphObject,
+  ImagePlacement,
+  Page,
+  Stroke,
+  TableObject,
+  TextBlock,
+} from '../storage/types';
 import { drawPaper } from './paper';
 import { drawStroke } from './strokeRender';
 import { paintText } from './textRender';
 import { boundsOfPoints } from '../lib/geometry';
+import { drawEquationObject, drawTableObject, equationBoxHeight, tableSize } from '../rich/richRender';
+import { drawGraphObject } from '../graph/plot';
 
 export interface RenderPageInput {
   page: Page;
   strokes: Stroke[];
   texts: TextBlock[];
   images: ImagePlacement[];
+  equations?: EquationPlacement[];
+  graphs?: GraphObject[];
+  tables?: TableObject[];
   assetBitmaps: Map<string, CanvasImageSource>;
   pdfCanvas: CanvasImageSource | null;
   /** Output pixels per document pixel. */
@@ -35,6 +48,16 @@ function contentBounds(input: RenderPageInput): { x: number; y: number; width: n
   }
   for (const image of input.images) {
     points.push({ x: image.x, y: image.y }, { x: image.x + image.width, y: image.y + image.height });
+  }
+  for (const equation of input.equations ?? []) {
+    points.push({ x: equation.x, y: equation.y }, { x: equation.x + equation.width, y: equation.y + equationBoxHeight(equation) });
+  }
+  for (const graph of input.graphs ?? []) {
+    points.push({ x: graph.x, y: graph.y }, { x: graph.x + graph.width, y: graph.y + graph.height });
+  }
+  for (const table of input.tables ?? []) {
+    const size = tableSize(table);
+    points.push({ x: table.x, y: table.y }, { x: table.x + size.width, y: table.y + size.height });
   }
   if (points.length === 0) return { x: 0, y: 0, width: 1240, height: 1754 };
   const bounds = boundsOfPoints(points, 48);
@@ -71,6 +94,7 @@ export function renderPage(input: RenderPageInput): RenderedPage {
       tint: input.tint,
       infinite: false,
       showBoundary: input.showBoundary && !infinite,
+      gridSpacing: input.page.gridSpacing,
     });
     if (input.pdfCanvas) {
       ctx.drawImage(input.pdfCanvas, bounds.x, bounds.y, bounds.width, bounds.height);
@@ -82,6 +106,9 @@ export function renderPage(input: RenderPageInput): RenderedPage {
     const bitmap = input.assetBitmaps.get(image.assetId);
     if (bitmap) ctx.drawImage(bitmap, image.x, image.y, image.width, image.height);
   }
+  for (const table of input.tables ?? []) drawTableObject(ctx, table);
+  for (const graph of input.graphs ?? []) drawGraphObject(ctx, graph, input.scale);
+  for (const equation of input.equations ?? []) drawEquationObject(ctx, equation);
   for (const text of input.texts) paintText(ctx, text);
 
   return {

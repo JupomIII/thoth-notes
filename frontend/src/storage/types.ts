@@ -28,7 +28,14 @@ export interface Notebook extends Envelope {
   lastOpenedAt: number | null;
 }
 
-export type PaperTemplate = 'blank' | 'ruled' | 'grid' | 'dots' | 'graph' | 'isometric';
+export type PaperTemplate =
+  | 'blank'
+  | 'ruled'
+  | 'grid'
+  | 'dots'
+  | 'graph'
+  | 'isometric'
+  | 'engineering';
 export type PageSize = 'a4' | 'letter' | 'infinite';
 
 export interface Page extends Envelope {
@@ -44,6 +51,8 @@ export interface Page extends Envelope {
   pdfAssetId: string | null;
   pdfPageIndex: number;
   backgroundTint: string | null;
+  /** Base spacing for grid-like paper, in document pixels. */
+  gridSpacing?: number;
 }
 
 export type DrawToolId =
@@ -54,13 +63,16 @@ export type DrawToolId =
   | 'eraser'
   | 'lasso'
   | 'text'
+  | 'select'
   | 'image'
   | 'line'
   | 'rect'
   | 'circle'
+  | 'ellipse'
+  | 'triangle'
   | 'arrow';
 
-export type ShapeKind = 'line' | 'rect' | 'circle' | 'arrow';
+export type ShapeKind = 'line' | 'rect' | 'circle' | 'ellipse' | 'triangle' | 'arrow';
 
 export interface StrokePoint {
   x: number;
@@ -90,6 +102,76 @@ export interface TextBlock extends Envelope {
   text: string;
   fontSize: number;
   color: string;
+  align: 'left' | 'center' | 'right';
+}
+
+/** A LaTeX equation placed on a page. The source is always kept, never an image. */
+export interface EquationPlacement extends Envelope {
+  pageId: string;
+  latex: string;
+  x: number;
+  y: number;
+  /** Document-space box width; the height follows the rendered formula. */
+  width: number;
+  fontSize: number;
+  color: string;
+  align: 'left' | 'center' | 'right';
+  /** Optional caption drawn above the formula. */
+  label: string;
+}
+
+export interface GraphFunction {
+  id: string;
+  /** Expression in mathjs syntax; converted from the LaTeX-ish input. */
+  expression: string;
+  color: string;
+  width: number;
+  dashed: boolean;
+  visible: boolean;
+}
+
+export interface GraphPoint {
+  id: string;
+  x: number;
+  y: number;
+  label: string;
+  color: string;
+}
+
+/** A live coordinate system on a page; the function list stays editable. */
+export interface GraphObject extends Envelope {
+  pageId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  functions: GraphFunction[];
+  points: GraphPoint[];
+  xMin: number;
+  xMax: number;
+  yMin: number;
+  yMax: number;
+  showGrid: boolean;
+  showAxes: boolean;
+  showLegend: boolean;
+  showAxisLabels: boolean;
+  gridStep: number;
+  title: string;
+  background: string | null;
+}
+
+export interface TableObject extends Envelope {
+  pageId: string;
+  x: number;
+  y: number;
+  width: number;
+  colWidths: number[];
+  rowHeights: number[];
+  cells: string[][];
+  headerRow: boolean;
+  fontSize: number;
+  color: string;
+  borderColor: string;
   align: 'left' | 'center' | 'right';
 }
 
@@ -134,6 +216,9 @@ export type SyncKind =
   | 'stroke'
   | 'text'
   | 'image'
+  | 'equation'
+  | 'graph'
+  | 'table'
   | 'asset';
 
 export const SYNC_KINDS: SyncKind[] = [
@@ -143,6 +228,9 @@ export const SYNC_KINDS: SyncKind[] = [
   'stroke',
   'text',
   'image',
+  'equation',
+  'graph',
+  'table',
   'asset',
 ];
 
@@ -169,6 +257,8 @@ export interface ToolSettings {
   line: BrushSettings;
   rect: BrushSettings;
   circle: BrushSettings;
+  ellipse: BrushSettings;
+  triangle: BrushSettings;
   arrow: BrushSettings;
   shapeFilled: boolean;
 }
@@ -184,6 +274,8 @@ export const DEFAULT_TOOL_SETTINGS: ToolSettings = {
   line: { color: '#1f1d1a', width: 3, opacity: 1 },
   rect: { color: '#1f1d1a', width: 3, opacity: 1 },
   circle: { color: '#1f1d1a', width: 3, opacity: 1 },
+  ellipse: { color: '#1f1d1a', width: 3, opacity: 1 },
+  triangle: { color: '#1f1d1a', width: 3, opacity: 1 },
   arrow: { color: '#1f1d1a', width: 3, opacity: 1 },
   shapeFilled: false,
 };
@@ -197,4 +289,16 @@ export interface AppSettings {
   serverUrl: string;
   autoSync: boolean;
   eraserMode: 'stroke' | 'partial';
+  /** Chrome colour scheme. 'system' follows iPadOS. */
+  theme: 'light' | 'dark' | 'system';
+  /** Recently used ink colours, newest first. */
+  recentColors: string[];
+  /** Base grid spacing in document pixels for grid-like paper. */
+  gridSpacing: number;
+  /** Snaps geometry tools to the grid and to 15-degree steps. */
+  snapEnabled: boolean;
+  /** Offers to replace a wobbly freehand shape with a clean one. */
+  recognizeShapes: boolean;
+  /** Last used drawing tool, restored on the next page. */
+  lastTool: string;
 }

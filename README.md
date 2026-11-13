@@ -32,6 +32,13 @@ Everything listed here is implemented; there are no decorative controls.
 | Editing | Undo/redo (bounded), clear selection, copy, paste, move, resize, delete, select all |
 | Paper | Blank, ruled, grid, dotted, engineering graph, isometric; A4, US Letter, infinite; change paper without touching ink |
 | Notebooks | Folders, notebooks, page ordering, duplication (page and notebook), favourites, archive, deletion with tombstones |
+| Equations | MathLive editing with a categorised symbol keyboard, KaTeX display, stored as LaTeX, movable, resizable, editable, duplicated, aligned, sized |
+| Graphs | Several functions with colour/width/dash/visibility, zoom, pan, reset, custom ranges, grid, axes, labels, legend, points, roots, intersections, extrema, derivative and tangent overlays — inserted as a live object, not a picture |
+| Tables | Editable rows, columns, cells, header row, alignment and text size |
+| Calculator | Scientific keyboard with degrees/radians, a running history, copy, insert as a number or as a formatted equation |
+| Units | Length, area, volume, mass, force, pressure, energy and temperature with SI-exact factors, selectable precision, copy and insert |
+| Geometry | Grid and 15° snapping for the shape tools, optional shape recognition on freehand ink with an accept/reject bar |
+| Appearance | Light, dark and system themes through CSS variables; paper stays white so exports print as written |
 | PDF | Import multi-page PDFs as pages, handwriting over the original, per-page annotation, PDF export onto the untouched source page, PNG export |
 | Storage | Immediate IndexedDB persistence, 120 ms write-behind batching, in-flight stroke recovery, quota error surfacing, persistent-storage request, versioned schema with migrations |
 | Sync | Incremental push/pull, offline queue, retries, manual and automatic sync, deterministic conflicts with a recovery UI, attachment transfer |
@@ -169,7 +176,30 @@ locally-trusted certificate is the practical fix. Full walkthrough:
   app. Automatic backups run at startup and every 24 hours; the newest seven are
   kept.
 
-## 7. Drawing engine notes
+## 7. Academic tools
+
+All of it runs from bundled code: MathLive, KaTeX, mathjs and pdf-lib are hoisted
+into their own lazy chunks, so a notebook without equations or graphs never
+downloads them and handwriting keeps priority on the main thread.
+
+| Tool | Where | What is stored |
+| --- | --- | --- |
+| Equation editor | Header **Insert → Equation**, ⌘E | LaTeX source, position, width, size, colour, alignment, label |
+| Graph | **Insert → Graph**, ⌘G | Functions with colour/width/dash/visibility, ranges, grid and axis flags, points, title |
+| Table | **Insert → Table** | Cells, column widths, row heights, border colour, header flag, alignment, size |
+| Calculator | Header **Calculator** | Nothing (history is per session) |
+| Unit converter | Calculator → **Convert** | Nothing |
+
+Objects on the page behave like ink objects for the tools that matter: tap with
+the **Select objects** tool to edit, duplicate, copy or delete; drag to move; drag
+the corner handle to resize; double-click to reopen the editor. They are painted
+into thumbnails, PNG exports and PDF pages at export resolution.
+
+Math is never evaluated with `eval`. Expressions run through the `mathjs/number`
+build with an `x` scope, and anything that leaves the finite range returns null so
+a curve simply breaks instead of drawing nonsense.
+
+## 8. Drawing engine notes
 
 * Strokes are vector records (`StrokePoint[]` with pressure, tilt, timestamp).
   They are never flattened for storage.
@@ -184,14 +214,14 @@ locally-trusted certificate is the practical fix. Full walkthrough:
 * Panning/zooming redraws vectors at the new scale, so ink stays crisp at any
   zoom instead of scaling a bitmap.
 
-## 8. Testing
+## 9. Testing
 
 See [`docs/TESTING.md`](docs/TESTING.md) for the exact commands, results and the
 hardware checklist. Summary of what was executed for this build:
 
-* `frontend`: strict `tsc` typecheck, `vite build` with service worker, 9 Vitest
-  unit tests.
-* `backend`: 12 pytest tests (auth, push/pull, conflict preservation, tombstones,
+* `frontend`: strict `tsc` typecheck, `vite build` with service worker, 19 Vitest
+  unit tests (geometry, stroke splitting, expression parsing and graph analysis).
+* `backend`: 23 pytest tests (auth, push/pull, conflict preservation, tombstones,
   asset round-trip, validation, backup round-trip, corrupted backup rejection,
   rotation).
 * Live server smoke test over real TLS: certificate generation, `/api/health`,
@@ -203,7 +233,7 @@ and tilt curves, palm rejection on glass, sustained frame rate, Safari PWA
 installation, iPadOS certificate trust UI. Those are listed as a manual
 checklist.
 
-## 9. Known limitations
+## 10. Known limitations
 
 * **Sync runs while the app is open.** iOS suspends background JavaScript; sync
   also triggers on launch, when the app becomes visible and when the network
@@ -221,8 +251,28 @@ checklist.
 * **Copy/paste is in-app** (a rendered ink clipboard), not the system pasteboard.
 * **Infinite pages** are unbounded for writing and panning, but export uses the
   content bounding box.
+* **Geometry toolkit** covers straight line, rectangle, ellipse and triangle as
+  vector shapes, with grid/angle snapping and optional shape recognition for
+  those four. A ruler, protractor, compass, arbitrary polygon, dimension line and
+  coordinate-point object are **not** implemented; the engineering and isometric
+  papers cover the layout need, not the measuring instruments.
+* **Shape recognition** runs after a freehand stroke and always asks first; the
+  original ink is only replaced when the proposal is accepted.
+* **Equations on canvas** (thumbnails, PNG, PDF) are painted by a LaTeX layout
+  routine built on KaTeX's parse tree rather than by KaTeX's DOM renderer, so a
+  handful of exotic constructs may space slightly differently than on screen.
+  The stored LaTeX is unchanged and re-edits perfectly.
+* **Table cells are edited in the table editor**, opened by double-clicking the
+  table or with **Edit**; cells are not typed into directly on the page.
+* **Dark mode themes the chrome only.** Paper stays white so exports and prints
+  match what was written; there is no per-page paper colour beyond the existing
+  paper picker.
+* **New object kinds across devices** travel as ordinary sync records, but the
+  round trip was not exercised against a running Windows server in this build —
+  only the record shapes, the backend's accepted kinds and the backup entries
+  were verified.
 
-## 10. Scripts reference
+## 11. Scripts reference
 
 | Script | Purpose |
 | --- | --- |
@@ -237,7 +287,7 @@ checklist.
 | `python -m app.cli token` | prints the pairing token |
 | `python -m app.cli cert --force` | regenerates the certificate (re-trust on iPad) |
 
-## 11. Security model
+## 12. Security model
 
 * Private-network binding plus a middleware that rejects non-private client IPs.
 * Constant-time pairing-token comparison on every data route.

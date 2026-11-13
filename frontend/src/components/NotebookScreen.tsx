@@ -37,6 +37,7 @@ const TEMPLATES: { value: PaperTemplate; label: string }[] = [
   { value: 'dots', label: 'Dotted' },
   { value: 'graph', label: 'Graph' },
   { value: 'isometric', label: 'Isometric' },
+  { value: 'engineering', label: 'Engineering' },
 ];
 
 export function NotebookScreen({ notebookId }: { notebookId: string }) {

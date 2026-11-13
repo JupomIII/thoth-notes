@@ -11,6 +11,7 @@ import { getDeviceId, getSettings, saveSettings } from './storage/repo';
 import { refreshCounters, startAutoSync, loadSyncConfig } from './sync/engine';
 import { syncStatus } from './sync/store';
 import { UpdatePrompt } from './components/UpdatePrompt';
+import { applyTheme, cachedTheme, watchSystemTheme, type ThemeName } from './lib/theme';
 
 export function App() {
   const route = useRoute();
@@ -18,11 +19,14 @@ export function App() {
   const [fatal, setFatal] = useState<string | null>(null);
 
   useEffect(() => {
+    let stopWatching: () => void = () => undefined;
     void (async () => {
       try {
         await getDeviceId();
         const settings = await getSettings();
         await saveSettings(settings);
+        applyTheme((settings.theme as ThemeName) ?? cachedTheme());
+        stopWatching = watchSystemTheme();
         await loadSyncConfig();
         if (navigator.storage?.persist) {
           const already = await navigator.storage.persisted();
@@ -46,7 +50,10 @@ export function App() {
       }
     };
     window.addEventListener('unhandledrejection', onRejection);
-    return () => window.removeEventListener('unhandledrejection', onRejection);
+    return () => {
+      window.removeEventListener('unhandledrejection', onRejection);
+      stopWatching();
+    };
   }, []);
 
   if (fatal) {

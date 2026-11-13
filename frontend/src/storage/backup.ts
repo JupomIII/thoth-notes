@@ -15,6 +15,9 @@ const FILES: { path: string; kind: SyncKind }[] = [
   { path: 'strokes.json', kind: 'stroke' },
   { path: 'texts.json', kind: 'text' },
   { path: 'images.json', kind: 'image' },
+  { path: 'equations.json', kind: 'equation' },
+  { path: 'graphs.json', kind: 'graph' },
+  { path: 'tables.json', kind: 'table' },
   { path: 'assets.json', kind: 'asset' },
 ];
 
@@ -106,6 +109,12 @@ async function tableRows(kind: SyncKind): Promise<unknown[]> {
       return db.texts.toArray();
     case 'image':
       return db.images.toArray();
+    case 'equation':
+      return db.equations.toArray();
+    case 'graph':
+      return db.graphs.toArray();
+    case 'table':
+      return db.tableObjects.toArray();
     case 'asset':
       return (await db.assets.toArray()).map(({ blob: _blob, ...rest }) => rest);
   }

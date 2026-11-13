@@ -26,6 +26,9 @@ KIND_FILES: dict[str, str] = {
     "stroke": "strokes.json",
     "text": "texts.json",
     "image": "images.json",
+    "equation": "equations.json",
+    "graph": "graphs.json",
+    "table": "tables.json",
     "asset": "assets.json",
 }
 

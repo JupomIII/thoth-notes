@@ -392,6 +392,7 @@ export function LibraryScreen({ folderId }: { folderId?: string }) {
                   ['dots', 'Dotted'],
                   ['graph', 'Graph'],
                   ['isometric', 'Isometric'],
+                  ['engineering', 'Engineering'],
                 ] as [PaperTemplate, string][]
               ).map(([value, label]) => (
                 <button
