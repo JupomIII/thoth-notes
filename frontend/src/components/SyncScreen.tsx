@@ -588,14 +588,19 @@ export function SyncScreen() {
             <ShieldCheck size={16} strokeWidth={1.8} /> Certificate and HTTPS help
           </summary>
           <ol className="mt-2 list-decimal space-y-1 pl-5">
-            <li>Copy <code>backend\storage\certs\thoth-rootCA.cer</code> to the iPad (AirDrop, Files or email).</li>
-            <li>Settings → General → VPN &amp; Device Management → install the profile.</li>
-            <li>Settings → General → About → Certificate Trust Settings → enable it.</li>
-            <li>Use the hostname the certificate was issued for, shown in the server window.</li>
+            <li>Open the laptop's <code>/setup</code> page in Safari on the iPad and accept the warning once.</li>
+            <li>Tap <span className="text-ink">Download the profile</span> there: nothing is emailed or AirDropped.</li>
+            <li>Settings → General → VPN &amp; Device Management → <em>Thoth Notes Local CA</em> → Install.</li>
+            <li>
+              Settings → General → About → Certificate Trust Settings → switch it on, then use
+              <span className="text-ink"> Check again</span> above.
+            </li>
           </ol>
           <p className="mt-2">
-            iOS blocks plain HTTP from an installed web app, so the laptop must speak HTTPS with a trusted
-            certificate. The pairing code never leaves your network and changes every ten minutes.
+            iOS blocks plain HTTP from an installed web app, so the laptop speaks HTTPS with a certificate this iPad
+            trusts. The local signing key stays on the laptop, so a new network address renews the certificate
+            without installing a second profile. The pairing code never leaves your network and changes every thirty
+            minutes.
           </p>
         </details>
 

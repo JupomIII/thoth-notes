@@ -95,11 +95,3 @@ export function drawStroke(
   }
   ctx.restore();
 }
-
-/** Draws a stroke preview (in-flight input) with identical styling. */
-export function drawLiveStroke(
-  ctx: CanvasRenderingContext2D,
-  stroke: Stroke,
-): void {
-  drawStroke(ctx, { ...stroke, opacity: stroke.opacity });
-}

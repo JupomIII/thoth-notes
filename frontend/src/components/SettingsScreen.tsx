@@ -105,7 +105,7 @@ export function SettingsScreen() {
               checked={settings?.palmRejection ?? true}
               onChange={(value) => void update({ palmRejection: value })}
               label="Palm rejection"
-              description="Ignores touch input while the pencil is in contact and just after it lifts."
+              description="Ignores touch while the pencil is down and for a moment after it lifts, so a resting hand cannot scroll or zoom the page."
             />
             <Toggle
               checked={settings?.showPageBoundary ?? false}
@@ -226,8 +226,8 @@ export function SettingsScreen() {
               hover distance. Tilt is mapped to nib width; azimuth-based shading is not possible.
             </li>
             <li>
-              Palm rejection is implemented by suppressing touch input while the pencil is down. iOS may still deliver
-              stray touches at the very start of a stroke; the pencil always wins.
+              Palm rejection suppresses touch while the pencil is drawing and for a short grace period after it lifts.
+              Pinching is unavailable during that window by design: wait a moment, or move the hand away.
             </li>
             <li>
               Two-finger rotation is not enabled — it conflicts with pinch zoom during fast writing. Use pinch to zoom

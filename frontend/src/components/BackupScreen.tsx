@@ -21,8 +21,6 @@ export function BackupScreen() {
   const [serverUrl, setServerUrl] = useState('');
   const [token, setToken] = useState('');
   const [backups, setBackups] = useState<BackupInfo[]>([]);
-  const [importOpen, setImportOpen] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -72,7 +70,6 @@ export function BackupScreen() {
       setMessage({ tone: 'error', text: error instanceof Error ? error.message : 'Import failed' });
     } finally {
       setBusy(null);
-      setImportOpen(false);
       if (importRef.current) importRef.current.value = '';
     }
   }
@@ -256,8 +253,6 @@ export function BackupScreen() {
         </section>
       </div>
 
-      <input ref={fileRef} type="file" className="hidden" onChange={() => setImportOpen(false)} />
-      <span className="hidden">{importOpen ? '' : ''}</span>
     </div>
   );
 }

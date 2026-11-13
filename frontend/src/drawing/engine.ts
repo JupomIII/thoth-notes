@@ -25,6 +25,7 @@ import { drawPaper } from './paper';
 import { drawStroke } from './strokeRender';
 import { paintText } from './textRender';
 import { HistoryStack } from './history';
+import { isPenSession, shouldRejectTouch } from './palm';
 
 type ShapeToolId = 'line' | 'rect' | 'circle' | 'ellipse' | 'triangle' | 'arrow';
 
@@ -139,7 +140,8 @@ type Session =
     };
 
 const HANDLE_SCREEN_SIZE = 18;
-const MIN_STROKE_DISTANCE = 0.35;
+/** Smallest gap between recorded points, in screen pixels at the current zoom. */
+const MIN_STROKE_SCREEN_DISTANCE = 0.35;
 const ERASE_THROTTLE_MS = 34;
 
 export class DrawingEngine {
@@ -184,6 +186,8 @@ export class DrawingEngine {
   private activePointers = new Map<number, { x: number; y: number; type: string }>();
   private penDown = false;
   private penLastAt = 0;
+  /** Smoothed pencil pressure, reset at the start of every stroke. */
+  private lastPressure = 0;
 
   private pendingPaper = true;
   private pendingInk = true;
@@ -243,6 +247,9 @@ export class DrawingEngine {
     stage.addEventListener('pointercancel', this.onPointerCancel);
     stage.addEventListener('wheel', this.onWheel, { passive: false });
     stage.addEventListener('contextmenu', this.onContextMenu);
+    stage.addEventListener('lostpointercapture', this.onLostPointerCapture);
+    window.addEventListener('blur', this.resetPenState);
+    document.addEventListener('visibilitychange', this.onVisibilityChange);
 
     this.history.subscribe(() => this.callbacks.onHistoryChange());
   }
@@ -258,6 +265,9 @@ export class DrawingEngine {
     this.stage.removeEventListener('pointercancel', this.onPointerCancel);
     this.stage.removeEventListener('wheel', this.onWheel);
     this.stage.removeEventListener('contextmenu', this.onContextMenu);
+    this.stage.removeEventListener('lostpointercapture', this.onLostPointerCapture);
+    window.removeEventListener('blur', this.resetPenState);
+    document.removeEventListener('visibilitychange', this.onVisibilityChange);
     this.paperCanvas.remove();
     this.inkCanvas.remove();
     this.liveCanvas.remove();
@@ -633,10 +643,18 @@ export class DrawingEngine {
     const touchCount = this.countTouches();
 
     if (e.pointerType === 'touch') {
-      if (this.palmRejection) {
-        if (this.penDown) return;
-        if (e.timeStamp - this.penLastAt < 40) return;
-        if (this.session.kind === 'draw' || this.session.kind === 'shape') return;
+      if (
+        shouldRejectTouch({
+          palmRejection: this.palmRejection,
+          penDown: this.penDown,
+          sincePenUp: e.timeStamp - this.penLastAt,
+          penSession: isPenSession(this.session.kind),
+        })
+      ) {
+        // A resting hand must not leave a pointer behind: an ignored contact that
+        // stays in the map turns the next real finger into a phantom pinch.
+        this.dropPointer(e.pointerId);
+        return;
       }
       if (touchCount >= 2) {
         this.beginPinch();
@@ -663,6 +681,7 @@ export class DrawingEngine {
 
   private beginTool(e: PointerEvent): void {
     const point = this.makePoint(e);
+    this.lastPressure = 0;
 
     switch (this.tool) {
       case 'fountain':
@@ -784,8 +803,18 @@ export class DrawingEngine {
         const list = events.length > 0 ? events : [e];
         for (const ev of list) {
           const p = this.makePoint(ev);
+          if (ev.pointerType === 'pen') {
+            // Pencil pressure is noisy at low force; an exponential average keeps
+            // line weight steady without lagging behind a deliberate press.
+            this.lastPressure =
+              this.lastPressure > 0
+                ? this.lastPressure + (p.pressure - this.lastPressure) * 0.45
+                : p.pressure;
+            p.pressure = this.lastPressure;
+          }
           const last = stroke.points[stroke.points.length - 1]!;
-          if (Math.hypot(p.x - last.x, p.y - last.y) < MIN_STROKE_DISTANCE) continue;
+          const gap = MIN_STROKE_SCREEN_DISTANCE / Math.max(0.15, this.view.scale);
+          if (Math.hypot(p.x - last.x, p.y - last.y) < gap) continue;
           stroke.points.push(p);
         }
         this.invalidateLive();
@@ -897,6 +926,37 @@ export class DrawingEngine {
     } catch {
       /* ignore */
     }
+  };
+
+  /** Drops a pointer that was rejected, so it cannot skew touch counting. */
+  private dropPointer(pointerId: number): void {
+    this.activePointers.delete(pointerId);
+    try {
+      this.stage.releasePointerCapture(pointerId);
+    } catch {
+      /* The pointer may already be gone. */
+    }
+  }
+
+  /**
+   * The pencil state must not outlive the events that produced it: an app switch
+   * or a lost capture can swallow the pointerup, which would otherwise suppress
+   * every finger until the next stroke.
+   */
+  private readonly resetPenState = (): void => {
+    this.penDown = false;
+    this.penLastAt = 0;
+    this.lastPressure = 0;
+  };
+
+  private readonly onVisibilityChange = (): void => {
+    if (document.visibilityState === 'hidden') this.resetPenState();
+  };
+
+  private readonly onLostPointerCapture = (e: PointerEvent): void => {
+    if (e.pointerType !== 'pen' || !this.penDown) return;
+    this.penDown = false;
+    this.penLastAt = e.timeStamp;
   };
 
   private onPointerCancel = (e: PointerEvent): void => {
