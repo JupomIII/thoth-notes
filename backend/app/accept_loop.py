@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import errno
+import inspect
 import logging
 from typing import Any
 
@@ -123,14 +124,32 @@ def _start_serving(self, protocol_factory, sock, sslcontext=None, server=None, b
     self.call_soon(run)
 
 
+REQUIRED_PARAMETERS = {
+    "protocol_factory",
+    "sock",
+    "sslcontext",
+    "server",
+    "backlog",
+    "ssl_handshake_timeout",
+    "ssl_shutdown_timeout",
+}
+
+
 def install() -> bool:
-    """Applies the patch once. Returns True when this host needed it."""
+    """Applies the patch once. Returns True when this host needed it.
+
+    A Python release that changes the accept hook simply keeps asyncio's own
+    loop: the server must start, even if that means the old behaviour.
+    """
     global _installed
     loop_class = getattr(asyncio, "ProactorEventLoop", None)
     if loop_class is None or _installed:
         return False
     base = loop_class.__mro__[1] if loop_class.__mro__ else None
     if base is None or not hasattr(base, "_start_serving"):
+        return False
+    if not REQUIRED_PARAMETERS.issubset(inspect.signature(base._start_serving).parameters):
+        log.warning("accept loop left untouched: this Python changed its signature")
         return False
     base._start_serving = _start_serving
     _installed = True
