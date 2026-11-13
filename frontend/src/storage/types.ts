@@ -221,19 +221,6 @@ export type SyncKind =
   | 'table'
   | 'asset';
 
-export const SYNC_KINDS: SyncKind[] = [
-  'folder',
-  'notebook',
-  'page',
-  'stroke',
-  'text',
-  'image',
-  'equation',
-  'graph',
-  'table',
-  'asset',
-];
-
 export const PAGE_SIZES: Record<PageSize, { width: number; height: number; label: string }> = {
   a4: { width: 1240, height: 1754, label: 'A4' },
   letter: { width: 1275, height: 1650, label: 'US Letter' },

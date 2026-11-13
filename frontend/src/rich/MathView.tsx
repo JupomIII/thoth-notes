@@ -19,10 +19,6 @@ function remember(key: string, html: string): string {
   return html;
 }
 
-export function katexHtml(latex: string, display = false): string {
-  return cache.get(`${display ? 'd' : 'i'}${latex}`) ?? '';
-}
-
 export function useKatex(latex: string, display = false): string {
   const key = `${display ? 'd' : 'i'}${latex}`;
   const [html, setHtml] = useState(() => cache.get(key) ?? '');

@@ -72,8 +72,10 @@ looking at the right laptop.
 ### Why a certificate exists at all
 
 GitHub Pages is an HTTPS origin and Safari refuses `http://` requests from it as
-mixed content; there is no override, not even for an installed web app. So the
-laptop must speak HTTPS with a certificate the iPad accepts. Apple does not let a
+mixed content; there is no override, not even for an installed web app. Measured
+on this stack, such a request fails in about 6 ms with `TypeError: Load failed`
+and never reaches the laptop, and Safari has no exemption for private addresses.
+So the laptop must speak HTTPS with a certificate the iPad accepts. Apple does not let a
 web page install a certificate silently, which is why the last two taps in
 Settings are unavoidable **for a purely local server**.
 

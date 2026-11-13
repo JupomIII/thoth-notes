@@ -56,7 +56,3 @@ export function useRoute(): Route {
   }, []);
   return route;
 }
-
-export function routeHref(path: string): string {
-  return `#${path.startsWith('/') ? path : `/${path}`}`;
-}

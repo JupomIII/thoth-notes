@@ -58,5 +58,4 @@ export interface ImportResult {
   errors: string[];
 }
 
-export const SYNC_PROTOCOL_VERSION = 1;
 export const MAX_BATCH = 200;

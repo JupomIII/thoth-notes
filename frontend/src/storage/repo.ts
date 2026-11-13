@@ -9,14 +9,13 @@ import type {
   ImagePlacement,
   Notebook,
   Page,
-  StoredAsset,
   Stroke,
   SyncKind,
   SyncRecord,
   TableObject,
   TextBlock,
 } from './types';
-import { DEFAULT_TOOL_SETTINGS, PAGE_SIZES } from './types';
+import { PAGE_SIZES } from './types';
 import { newId, now } from '../lib/id';
 
 type AnyEntity = Envelope & Record<string, unknown>;
@@ -84,10 +83,6 @@ export async function saveSettings(patch: Partial<AppSettings>): Promise<AppSett
   const next = { ...current, ...patch };
   await db.syncState.put({ key: 'settings', value: next });
   return next;
-}
-
-export function defaultToolSettings() {
-  return structuredClone(DEFAULT_TOOL_SETTINGS);
 }
 
 /** Marks an object as locally dirty so the sync engine pushes it. */
@@ -335,11 +330,6 @@ export async function activePages(notebookId: string): Promise<Page[]> {
     .sort((a, b) => a.index - b.index || a.createdAt - b.createdAt);
 }
 
-export async function activeNotebooks(): Promise<Notebook[]> {
-  const all = await db.notebooks.toArray();
-  return all.filter((n) => n.deletedAt === null);
-}
-
 export async function activeFolders(): Promise<Folder[]> {
   const all = await db.folders.toArray();
   return all.filter((f) => f.deletedAt === null);
@@ -508,27 +498,9 @@ async function cloneRichToPage(fromPageId: string, toPageId: string): Promise<vo
   }
 }
 
-export async function getAssetBlob(assetId: string): Promise<Blob | null> {
-  const asset = await db.assets.get(assetId);
-  return asset ? asset.blob : null;
-}
-
 /* ------------------------------------------------------------------ */
 /* Sync helpers                                                        */
 /* ------------------------------------------------------------------ */
-
-export function toSyncRecord(kind: SyncKind, entity: AnyEntity): SyncRecord {
-  return {
-    kind,
-    id: entity.id,
-    data: entity,
-    createdAt: entity.createdAt,
-    updatedAt: entity.updatedAt,
-    version: entity.version,
-    deviceId: entity.deviceId,
-    deletedAt: entity.deletedAt,
-  };
-}
 
 export async function readEntity(kind: SyncKind, id: string): Promise<AnyEntity | undefined> {
   return tableFor(kind).get(id);
@@ -550,9 +522,4 @@ export async function getSyncState<T>(key: string, fallback: T): Promise<T> {
 
 export async function setSyncState(key: string, value: unknown): Promise<void> {
   await db.syncState.put({ key, value });
-}
-
-export async function listAssets(): Promise<StoredAsset[]> {
-  const all = await db.assets.toArray();
-  return all.filter((a) => a.deletedAt === null);
 }

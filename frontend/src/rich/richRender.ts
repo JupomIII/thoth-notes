@@ -6,7 +6,6 @@
 
 import type { EquationPlacement, TableObject } from '../storage/types';
 import { typesetMath } from './mathTypeset';
-import { drawGraphObject } from '../graph/plot';
 
 const UI_FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 
@@ -115,18 +114,4 @@ export function drawTableObject(ctx: CanvasRenderingContext2D, table: TableObjec
   }
   ctx.stroke();
   ctx.restore();
-}
-
-export function drawRichObjects(
-  ctx: CanvasRenderingContext2D,
-  objects: {
-    equations: EquationPlacement[];
-    graphs: Parameters<typeof drawGraphObject>[1][];
-    tables: TableObject[];
-  },
-  scale = 1,
-): void {
-  for (const table of objects.tables) drawTableObject(ctx, table);
-  for (const graph of objects.graphs) drawGraphObject(ctx, graph, scale);
-  for (const equation of objects.equations) drawEquationObject(ctx, equation);
 }

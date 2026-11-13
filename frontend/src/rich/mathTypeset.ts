@@ -621,39 +621,3 @@ export function typesetMath(latex: string, size: number, color: string): MathLay
   cache.set(key, result);
   return result;
 }
-
-/** Measures only, for layout code that runs before any canvas paint. */
-export function measureMath(latex: string, size: number, color = '#1f1d1a'): { width: number; height: number; depth: number } {
-  const layout = typesetMath(latex, size, color);
-  return { width: layout.width, height: layout.height, depth: layout.depth };
-}
-
-/** Draws a formula with its box's top-left corner at (x, top). */
-export function drawTypeset(
-  ctx: Ctx,
-  latex: string,
-  x: number,
-  top: number,
-  size: number,
-  color: string,
-  maxWidth?: number,
-): { width: number; height: number } {
-  const layout = typesetMath(latex, size, color);
-  ctx.save();
-  if (maxWidth && layout.width > maxWidth) {
-    const factor = maxWidth / layout.width;
-    ctx.translate(x, top + layout.height * factor);
-    ctx.scale(factor, factor);
-    layout.draw(ctx, 0, 0);
-    ctx.restore();
-    return { width: maxWidth, height: (layout.height + layout.depth) * factor };
-  }
-  layout.draw(ctx, x, top + layout.height);
-  ctx.restore();
-  return { width: layout.width, height: layout.height + layout.depth };
-}
-
-export function equationHeight(latex: string, size: number, color = '#1f1d1a'): number {
-  const layout = typesetMath(latex, size, color);
-  return layout.height + layout.depth;
-}

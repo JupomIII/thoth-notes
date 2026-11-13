@@ -82,24 +82,3 @@ export function brushConfig(tool: DrawToolId, width: number, points: StrokePoint
     simulatePressure: !hasRealPressure(points),
   };
 }
-
-export const BRUSH_TOOLS: DrawToolId[] = ['fountain', 'ballpoint', 'pencil', 'highlighter'];
-export const SHAPE_TOOLS: DrawToolId[] = ['line', 'rect', 'circle', 'ellipse', 'triangle', 'arrow'];
-
-export const TOOL_LABELS: Record<DrawToolId, string> = {
-  select: 'Select',
-  fountain: 'Fountain pen',
-  ballpoint: 'Ballpoint',
-  pencil: 'Pencil',
-  highlighter: 'Highlighter',
-  eraser: 'Eraser',
-  lasso: 'Lasso select',
-  text: 'Text',
-  image: 'Image',
-  line: 'Line',
-  rect: 'Rectangle',
-  circle: 'Circle',
-  ellipse: 'Ellipse',
-  triangle: 'Triangle',
-  arrow: 'Arrow',
-};

@@ -40,11 +40,3 @@ export function paintText(ctx: CanvasRenderingContext2D, text: TextBlock): void 
   }
   ctx.restore();
 }
-
-export function textBlockHeight(ctx: CanvasRenderingContext2D, text: TextBlock): number {
-  ctx.save();
-  ctx.font = `${text.fontSize}px ${TEXT_FONT_STACK}`;
-  const lines = wrapText(ctx, text.text, text.width);
-  ctx.restore();
-  return Math.max(text.fontSize * 1.4, lines.length * text.fontSize * 1.35);
-}

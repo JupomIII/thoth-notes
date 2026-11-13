@@ -82,11 +82,11 @@ export function BackupScreen() {
       const client = new SyncClient(config.serverUrl, config.token, '');
       if (action === 'create') {
         const info = await client.createBackup();
-        setMessage({ tone: 'ok', text: `Windows backup created: ${info.name}` });
+        setMessage({ tone: 'ok', text: `Backup created on the laptop: ${info.name}` });
       }
       setBackups(await client.listBackups());
     } catch (error) {
-      setMessage({ tone: 'error', text: error instanceof Error ? error.message : 'Windows backup failed' });
+      setMessage({ tone: 'error', text: error instanceof Error ? error.message : 'The backup could not be created' });
     } finally {
       setBusy(null);
     }
@@ -166,11 +166,11 @@ export function BackupScreen() {
 
         <section className="rounded-xl border border-line bg-paper-raised p-4">
           <h2 className="flex items-center gap-2 font-serif text-[17px] text-ink">
-            <DatabaseBackup size={17} strokeWidth={1.8} /> Windows archive
+            <DatabaseBackup size={17} strokeWidth={1.8} /> Windows backups
           </h2>
           <p className="mt-1 text-[12.5px] leading-relaxed text-ink-muted">
-            The server keeps rotating archives in <code className="rounded bg-paper-sunken px-1">backend\storage\backups</code>.
-            Rotation keeps the newest seven by default.
+            The laptop keeps rotating backups in <code className="rounded bg-paper-sunken px-1">backend\storage\backups</code>.
+            The newest seven are kept by default.
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <Field label="Server address">
@@ -216,7 +216,7 @@ export function BackupScreen() {
                 await syncNow();
               }}
             >
-              Sync first
+              Sync now
             </Button>
           </div>
           {backups.length > 0 && (

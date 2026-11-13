@@ -349,7 +349,6 @@ function sameJson(local: unknown, incoming: unknown): boolean {
   return stableStringify(local) === stableStringify(incoming);
 }
 
-let autoTimer: number | null = null;
 let listenersBound = false;
 
 export function startAutoSync(): void {
@@ -364,7 +363,7 @@ export function startAutoSync(): void {
       await syncNow({ silent: true });
     })();
   };
-  autoTimer = window.setInterval(tick, 45000);
+  window.setInterval(tick, 45000);
   window.addEventListener('online', () => {
     void syncNow({ silent: true });
   });
@@ -372,11 +371,6 @@ export function startAutoSync(): void {
     if (document.visibilityState === 'visible') tick();
   });
   window.setTimeout(tick, 4000);
-}
-
-export function stopAutoSync(): void {
-  if (autoTimer !== null) window.clearInterval(autoTimer);
-  autoTimer = null;
 }
 
 export async function resolveConflict(seq: number, strategy: 'keep-local' | 'keep-server'): Promise<void> {

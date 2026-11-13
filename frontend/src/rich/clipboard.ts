@@ -1,5 +1,4 @@
 import type { EquationPlacement, GraphObject, TableObject } from '../storage/types';
-import type { RichKind } from '../storage/repo';
 
 export type ClipboardPayload =
   | { kind: 'equation'; data: EquationPlacement }
@@ -19,14 +18,4 @@ export function setRichClipboard(next: ClipboardPayload | null): void {
 
 export function getRichClipboard(): ClipboardPayload | null {
   return payload;
-}
-
-export function clearRichClipboard(): void {
-  payload = null;
-}
-
-export function kindLabel(kind: RichKind): string {
-  if (kind === 'equation') return 'Equation';
-  if (kind === 'graph') return 'Graph';
-  return 'Table';
 }

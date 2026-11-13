@@ -6,7 +6,6 @@
 
 import type { GraphFunction, GraphPoint } from '../storage/types';
 
-
 export interface PlotConfig {
   functions: GraphFunction[];
   points: GraphPoint[];
@@ -70,10 +69,6 @@ export function onMathEngineReady(listener: () => void): () => void {
   return () => {
     engineListeners.delete(listener);
   };
-}
-
-export function mathEngineReady(): boolean {
-  return engine !== null;
 }
 
 const FONT = '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif';
@@ -378,22 +373,6 @@ export function derivativeAt(fn: Compiled, x: number, xMin: number, xMax: number
   const after = fn(x + h);
   if (before === null || after === null) return null;
   return (after - before) / (2 * h);
-}
-
-export function tangentLine(
-  fn: Compiled,
-  x0: number,
-  xMin: number,
-  xMax: number,
-): { x: number; y: number; slope: number; intercept: number } | null {
-  const y0 = fn(x0);
-  const slope = derivativeAt(fn, x0, xMin, xMax);
-  if (y0 === null || slope === null) return null;
-  return { x: x0, y: y0, slope, intercept: y0 - slope * x0 };
-}
-
-export function derivativeCurve(fn: Compiled, xMin: number, xMax: number): Compiled {
-  return (x: number) => derivativeAt(fn, x, xMin, xMax);
 }
 
 /* ------------------------------------------------------------------ */

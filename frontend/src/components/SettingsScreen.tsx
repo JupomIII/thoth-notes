@@ -105,7 +105,7 @@ export function SettingsScreen() {
               checked={settings?.palmRejection ?? true}
               onChange={(value) => void update({ palmRejection: value })}
               label="Palm rejection"
-              description="Ignores touch while the pencil is down and for a moment after it lifts, so a resting hand cannot scroll or zoom the page."
+              description="Ignores touch while the Apple Pencil is down and for a moment after it lifts, so a resting hand cannot scroll or zoom the page."
             />
             <Toggle
               checked={settings?.showPageBoundary ?? false}
@@ -192,8 +192,8 @@ export function SettingsScreen() {
           <h2 className="font-serif text-[17px] text-ink">Synchronisation</h2>
           <p className="mt-1 text-[12.5px] leading-relaxed text-ink-muted">
             {serverUrl && autoSync
-              ? `Paired with ${serverUrl}. Pairing, destination, automatic sync and conflicts are on the sync screen.`
-              : 'Not paired yet. Pair once with your laptop; the pairing token stays in this iPad\u2019s own database and never appears in the site.'}
+              ? `Paired with ${serverUrl}. Open Synchronisation for the destination, automatic sync and conflicts.`
+              : 'Not paired yet. Open Synchronisation to pair once with your laptop; the token stays in this iPad\u2019s own database and never appears in the site.'}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => navigate('/sync')}>
@@ -226,16 +226,16 @@ export function SettingsScreen() {
               hover distance. Tilt is mapped to nib width; azimuth-based shading is not possible.
             </li>
             <li>
-              Palm rejection suppresses touch while the pencil is drawing and for a short grace period after it lifts.
-              Pinching is unavailable during that window by design: wait a moment, or move the hand away.
+              Pinch-zoom pauses for a moment after the Apple Pencil lifts, so a resting hand cannot zoom the page
+              mid-word. Turn palm rejection off in Writing if you would rather have touch respond immediately.
             </li>
             <li>
               Two-finger rotation is not enabled — it conflicts with pinch zoom during fast writing. Use pinch to zoom
               and one-finger drag to pan.
             </li>
             <li>
-              Installed PWAs cannot call <code>http://</code> addresses. Run the Windows server with its HTTPS
-              certificate as documented, or open the app from the server's own origin.
+              An installed web app cannot call a plain <code>http://</code> address, so the Windows server keeps its
+              HTTPS certificate. The iPad setup instructions cover the one-time profile install.
             </li>
           </ul>
         </section>

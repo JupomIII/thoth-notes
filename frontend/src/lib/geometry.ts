@@ -90,14 +90,6 @@ export function zoomAround(
   };
 }
 
-export function applyInverse(
-  view: { scale: number; tx: number; ty: number },
-  x: number,
-  y: number,
-): { x: number; y: number } {
-  return { x: (x - view.tx) / view.scale, y: (y - view.ty) / view.scale };
-}
-
 /** Ramer–Douglas–Peucker simplification, used before persisting dense input. */
 export function simplifyPoints(points: StrokePoint[], tolerance = 0.35): StrokePoint[] {
   if (points.length <= 2) return points;
@@ -127,11 +119,6 @@ export function simplifyPoints(points: StrokePoint[], tolerance = 0.35): StrokeP
   const result: StrokePoint[] = [];
   for (let i = 0; i < points.length; i++) if (keep[i]) result.push(points[i]!);
   return result;
-}
-
-/** Builds the two editable anchor points of a shape gesture. */
-export function shapePoints(start: StrokePoint, end: StrokePoint): StrokePoint[] {
-  return [start, end];
 }
 
 export function shapeOutlinePath(kind: ShapeKind, a: StrokePoint, b: StrokePoint): Path2D {

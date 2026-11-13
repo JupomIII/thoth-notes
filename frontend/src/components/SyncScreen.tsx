@@ -27,7 +27,6 @@ import { syncStatus } from '../sync/store';
 import { relativeTime } from '../lib/format';
 import { navigate } from '../app/router';
 import { Button, Field, ScreenHeader, Spinner, TextInput, Toggle, cx } from './ui';
-import { LocalHttpProbe } from './LocalHttpProbe';
 
 type Config = Awaited<ReturnType<typeof loadSyncConfig>>;
 
@@ -172,7 +171,7 @@ export function SyncScreen() {
     options: { silent?: boolean } = {},
   ): Promise<void> {
     if (!rawUrl.trim()) {
-      setError('Enter the address shown in the server window, for example https://jps_laptop.local:8443');
+      setError("Enter the laptop's address from the server window, for example https://192.168.1.20:8443");
       return;
     }
     if (cleanCode(rawCode).length !== 6) {
@@ -382,8 +381,8 @@ export function SyncScreen() {
           <section className="rounded-xl border border-line bg-paper-raised p-4">
             <h2 className="font-serif text-[17px] text-ink">Set up this iPad</h2>
             <p className="mt-1 text-[12.5px] leading-relaxed text-ink-muted">
-              Two steps, both on this iPad. The trust profile is served by your laptop over your own network:
-              nothing is emailed, AirDropped or copied by hand.
+              Two steps, both on this iPad. The trust profile comes from your laptop over your own network: nothing is
+              emailed or copied by hand.
             </p>
 
             <div className="mt-4 space-y-3">
@@ -397,7 +396,7 @@ export function SyncScreen() {
                     setServerUrl(event.target.value);
                     setProbe(null);
                   }}
-                  placeholder="https://jps_laptop.local:8443"
+                  placeholder="https://192.168.1.20:8443"
                   inputMode="url"
                   autoCapitalize="off"
                   autoCorrect="off"
@@ -485,7 +484,7 @@ export function SyncScreen() {
                   <h3 className="text-[14px] text-ink">Pair</h3>
                   <p className="mt-0.5 text-[12.5px] leading-relaxed text-ink-muted">
                     Scan the QR code on the laptop's pairing page and this screen opens with the code already filled
-                    in, or type the six characters shown there.
+                    in, or type the pairing code shown there.
                   </p>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <div className="w-[168px]">
@@ -514,7 +513,7 @@ export function SyncScreen() {
                     )}
                   </div>
                   <p className="mt-1 text-[11.5px] text-ink-faint">
-                    Codes change every thirty minutes; the previous one is accepted for one window.
+                    The pairing code changes every thirty minutes; the previous one stays valid for one window.
                   </p>
                 </div>
               </li>
@@ -581,26 +580,19 @@ export function SyncScreen() {
           )}
         </section>
 
-        <LocalHttpProbe serverUrl={serverUrl} />
-
         <details className="rounded-xl border border-line bg-paper-sunken p-4 text-[12.5px] leading-relaxed text-ink-soft">
           <summary className="flex cursor-pointer select-none items-center gap-2 font-serif text-[16px] text-ink">
-            <ShieldCheck size={16} strokeWidth={1.8} /> Certificate and HTTPS help
+            <ShieldCheck size={16} strokeWidth={1.8} /> Why the laptop needs a certificate
           </summary>
-          <ol className="mt-2 list-decimal space-y-1 pl-5">
-            <li>Open the laptop's <code>/setup</code> page in Safari on the iPad and accept the warning once.</li>
-            <li>Tap <span className="text-ink">Download the profile</span> there: nothing is emailed or AirDropped.</li>
-            <li>Settings → General → VPN &amp; Device Management → <em>Thoth Notes Local CA</em> → Install.</li>
-            <li>
-              Settings → General → About → Certificate Trust Settings → switch it on, then use
-              <span className="text-ink"> Check again</span> above.
-            </li>
-          </ol>
           <p className="mt-2">
-            iOS blocks plain HTTP from an installed web app, so the laptop speaks HTTPS with a certificate this iPad
-            trusts. The local signing key stays on the laptop, so a new network address renews the certificate
-            without installing a second profile. The pairing code never leaves your network and changes every thirty
-            minutes.
+            This app is served over HTTPS, and Safari refuses to let an HTTPS page call a plain <code>http://</code> address
+            on your network: it stops the request before it leaves the iPad. The laptop therefore has to speak
+            HTTPS with a certificate the iPad trusts.
+          </p>
+          <p className="mt-2">
+            The profile in step 1 does only that — it vouches for your own laptop. It never leaves the two devices, the
+            signing key stays on the laptop, and a new network address renews the certificate without a second profile.
+            You only reinstall it if you change laptops.
           </p>
         </details>
 

@@ -166,13 +166,3 @@ and every hardware check below.
 Not executed: the two Settings taps on a real iPad (no hardware here), and a
 live Tailscale or Cloudflare tunnel — tunnel mode was verified by configuration
 and page rendering only.
-
-## Certificate-free local HTTP (executed)
-
-The probe server (`python -m app.feasibility`, port 8787, no TLS) answered on the
-LAN address with permissive CORS and the private-network header. From the app on
-a plain HTTP origin the probe reached the laptop in 11 ms; from the deployed
-GitHub Pages origin every attempt was blocked in 6 ms with `TypeError: Failed to
-fetch` and Chromium logged *Mixed Content … blocked; the content must be served
-over HTTPS*. Full result, Safari wording and the on-iPad steps are in
-[`LOCAL-HTTP-FEASIBILITY.md`](LOCAL-HTTP-FEASIBILITY.md).
