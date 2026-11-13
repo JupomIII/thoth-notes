@@ -100,7 +100,8 @@ millisecond still agree on the winner without a round trip.
 ### What the Windows server does with a conflict
 
 * The losing copy is appended to `conflicts` (kind, object id, label, both
-  payloads, timestamp).
+  payloads, timestamp). One row per object and decision: a push retried after a
+  lost response does not duplicate the entry.
 * The winner stays in `objects`; the loser is also included in every backup as
   `conflicts.json`.
 
@@ -109,9 +110,10 @@ millisecond still agree on the winner without a round trip.
 Asset bytes never travel inside JSON. The order is:
 
 1. The client stores the blob in IndexedDB and queues the asset metadata record.
-2. Push accepts the metadata.
-3. The client `PUT`s each queued blob to `/api/sync/assets/{id}` (one file per
-   record, skipped when the server already has the bytes).
+2. On the next push, the blob is `PUT` to `/api/sync/assets/{id}` **before** the
+   metadata record is sent. A failed upload therefore leaves the queue entry in
+   place, and the next run retries instead of publishing a record with no file.
+3. Push then accepts the metadata.
 4. On pull, an asset record without a local blob triggers a `GET`.
 
 PDFs keep their original bytes: annotations are separate stroke records, which
@@ -126,9 +128,16 @@ device that was offline still learns about deletions.
 
 ## Failure handling
 
-* Every request has a 20 s timeout (8 s for the health probe).
-* Network failures leave the outbox untouched and set the status to
-  `error` with the message; the next run retries the same records.
+* Every request has a timeout: 20 s for sync calls, 8 s for the health probe,
+  60 s for one attachment, 120 s for a backup.
+* Network failures leave the outbox untouched and set the status to `error`
+  with a sentence the reader can act on; the next run retries the same records.
 * The queue is idempotent: re-pushing an identical record is a no-op.
-* Sync never runs concurrently; a second manual request while one is in flight
-  returns immediately.
+* Sync never runs concurrently. A tap or timer tick that lands during a run
+  joins that run instead of failing or starting a second one.
+* Automatic sync runs every 45 s, backs off geometrically (90 s, 180 s, then a
+  five-minute cap with mild jitter) while attempts fail, and resets the moment a
+  run succeeds or the device comes back online. Returning to the app schedules an
+  attempt within a second.
+* `lastSyncAt` only moves when a run finishes, so the screen never claims a sync
+  that did not happen.

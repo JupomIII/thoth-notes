@@ -362,9 +362,19 @@ export function SyncScreen() {
               </Button>
             </div>
             <p className="mt-2 text-[11.5px] text-ink-muted">
-              {status.online ? 'Ready' : 'Offline'} · {status.pending} change{status.pending === 1 ? '' : 's'} waiting ·{' '}
-              synced {relativeTime(status.lastSyncAt)}
+              {status.phase === 'syncing'
+                ? 'Syncing…'
+                : status.phase === 'error'
+                  ? 'Could not sync'
+                  : status.online
+                    ? 'Ready'
+                    : 'Offline · changes are queued'}{' '}
+              ·{' '}
+              {status.pending} change{status.pending === 1 ? '' : 's'} waiting · synced {relativeTime(status.lastSyncAt)}
             </p>
+            {!error && status.phase === 'error' && status.message && (
+              <p className="mt-1 text-[11.5px] leading-relaxed text-danger">{status.message}</p>
+            )}
             <Toggle
               checked={autoSync}
               onChange={async (value) => {
@@ -372,7 +382,7 @@ export function SyncScreen() {
                 await saveSyncConfig({ autoSync: value });
               }}
               label="Sync automatically"
-              description="Pushes queued changes and pulls new ones every 45 seconds while the laptop answers."
+              description="Checks every 45 seconds, and waits longer between attempts while the laptop stays away."
             />
           </section>
         ) : null}

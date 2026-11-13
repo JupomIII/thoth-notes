@@ -14,6 +14,7 @@ import { SyncClient, SyncError, normalizeServerUrl } from './client';
 import { MAX_BATCH } from './protocol';
 import { syncStatus } from './store';
 import { now } from '../lib/id';
+import { SYNC_INTERVAL_MS, retryDelay } from './backoff';
 
 export interface SyncConfig {
   serverUrl: string;
@@ -94,12 +95,17 @@ export async function testConnection(
   }
 }
 
-let running = false;
+let inflight: Promise<SyncOutcome> | null = null;
 
-export async function syncNow(options: { silent?: boolean } = {}): Promise<SyncOutcome> {
-  if (running) {
-    return { ok: false, pushed: 0, pulled: 0, conflicts: 0, assets: 0, message: 'Sync already running' };
-  }
+export function syncNow(): Promise<SyncOutcome> {
+  // A tap and a timer tick can land together: join the run instead of failing.
+  inflight ??= runSync().finally(() => {
+    inflight = null;
+  });
+  return inflight;
+}
+
+async function runSync(): Promise<SyncOutcome> {
   const config = await loadSyncConfig();
   if (!config.serverUrl || !config.token) {
     await syncStatus.update({ phase: 'unconfigured', message: 'No pairing token configured' });
@@ -110,7 +116,6 @@ export async function syncNow(options: { silent?: boolean } = {}): Promise<SyncO
     return { ok: false, pushed: 0, pulled: 0, conflicts: 0, assets: 0, message: 'Offline' };
   }
 
-  running = true;
   const deviceId = await getDeviceId();
   const client = new SyncClient(config.serverUrl, config.token, deviceId);
   await syncStatus.update({ phase: 'syncing', message: 'Synchronising…' });
@@ -119,7 +124,6 @@ export async function syncNow(options: { silent?: boolean } = {}): Promise<SyncO
   let pulled = 0;
   let conflictCount = 0;
   let assets = 0;
-  const assetsToUpload = new Set<string>();
 
   try {
     // 1. Push local changes in bounded batches.
@@ -137,7 +141,6 @@ export async function syncNow(options: { silent?: boolean } = {}): Promise<SyncO
           const { blob: _blob, ...meta } = entity as unknown as StoredAsset;
           data = meta;
         }
-        if (entry.kind === 'asset') assetsToUpload.add(entry.id);
         records.set(key, {
           kind: entry.kind as SyncKind,
           id: entity.id,
@@ -153,6 +156,10 @@ export async function syncNow(options: { silent?: boolean } = {}): Promise<SyncO
         await db.outbox.bulkDelete(batch.map((b) => b.seq!).filter((n) => n !== undefined));
         continue;
       }
+      // Attachment bytes go first: if an upload fails, the queue entry survives
+      // and the next run retries, instead of leaving a record without its file.
+      const batchAssets = new Set(batch.filter((entry) => entry.kind === 'asset').map((entry) => entry.id));
+      if (batchAssets.size > 0) assets += await uploadAssets(client, batchAssets);
       const response = await client.push([...records.values()]);
       for (const accepted of response.accepted) {
         const local = await readEntity(accepted.kind, accepted.id);
@@ -165,13 +172,12 @@ export async function syncNow(options: { silent?: boolean } = {}): Promise<SyncO
         }
       }
       for (const conflict of response.conflicts) {
-        await db.conflicts.add({
+        await recordConflict({
           kind: conflict.kind,
           objectId: conflict.id,
           label: describeRecord(conflict.kind, conflict.client.data),
           local: conflict.client.data,
           server: conflict.server.data,
-          createdAt: now(),
         });
         await applyRemoteRecord(conflict.server);
         await clearOutboxFor(conflict.kind, conflict.id);
@@ -179,14 +185,9 @@ export async function syncNow(options: { silent?: boolean } = {}): Promise<SyncO
       }
       await db.outbox.bulkDelete(batch.map((b) => b.seq!).filter((n) => n !== undefined));
       pushed += records.size;
-      if (records.size === 0) break;
     }
 
-    // 2. Upload attachment bytes for assets queued in this run.
-    assets = await uploadAssets(client, assetsToUpload);
-
-    // 3. Pull remote changes since the stored cursor.
-    await setSyncState('lastSyncAt', now());
+    // 2. Pull remote changes since the stored cursor.
     for (;;) {
       const cursor = await getSyncState<number>(CURSOR_KEY, 0);
       const changes = await client.changes(cursor);
@@ -199,7 +200,7 @@ export async function syncNow(options: { silent?: boolean } = {}): Promise<SyncO
       if (!changes.hasMore) break;
     }
 
-    // 4. Fetch asset bytes referenced by records that arrived without them.
+    // 3. Fetch asset bytes referenced by records that arrived without them.
     const downloaded = await downloadMissingAssets(client);
     assets += downloaded;
 
@@ -228,11 +229,9 @@ export async function syncNow(options: { silent?: boolean } = {}): Promise<SyncO
         : error instanceof Error
           ? error.message
           : 'Unknown sync error';
-    await syncStatus.update({ phase: 'error', message: options.silent ? `Sync failed: ${message}` : message });
+    await syncStatus.update({ phase: 'error', message });
     await refreshCounters();
     return { ok: false, pushed, pulled, conflicts: conflictCount, assets, message };
-  } finally {
-    running = false;
   }
 }
 
@@ -303,6 +302,35 @@ function describeRecord(kind: SyncKind, data: unknown): string {
   return 'Attachment';
 }
 
+interface PendingConflict {
+  kind: SyncKind;
+  objectId: string;
+  label: string;
+  local: unknown;
+  server: unknown;
+}
+
+/**
+ * One row per object and decision. A push that is retried after a lost response
+ * would otherwise pile up identical conflicts the reader has to dismiss twice.
+ */
+async function recordConflict(entry: PendingConflict): Promise<void> {
+  const existing = await db.conflicts
+    .where('objectId')
+    .equals(entry.objectId)
+    .filter((row) => row.kind === entry.kind)
+    .first();
+  if (existing?.seq !== undefined) {
+    await db.conflicts.update(existing.seq, {
+      label: entry.label,
+      local: entry.local,
+      server: entry.server,
+    });
+    return;
+  }
+  await db.conflicts.add({ ...entry, createdAt: now() });
+}
+
 async function applyPulledRecord(record: SyncRecord): Promise<{ applied: boolean; conflict: boolean }> {
   const local = await readEntity(record.kind, record.id);
   if (!local) {
@@ -315,13 +343,12 @@ async function applyPulledRecord(record: SyncRecord): Promise<{ applied: boolean
   }
   const queued = await db.outbox.where('[kind+id]').equals([record.kind, record.id]).count();
   if (queued > 0) {
-    await db.conflicts.add({
+    await recordConflict({
       kind: record.kind,
       objectId: record.id,
       label: describeRecord(record.kind, record.data),
       local,
       server: record.data,
-      createdAt: now(),
     });
     await applyRemoteRecord(record);
     await clearOutboxFor(record.kind, record.id);
@@ -350,27 +377,52 @@ function sameJson(local: unknown, incoming: unknown): boolean {
 }
 
 let listenersBound = false;
+let failures = 0;
+let timer: number | null = null;
+
+/** One pending attempt at a time; a new schedule replaces the old one. */
+function schedule(delay: number): void {
+  if (timer !== null) window.clearTimeout(timer);
+  timer = window.setTimeout(() => {
+    void tick();
+  }, delay);
+}
+
+async function tick(): Promise<void> {
+  const config = await loadSyncConfig();
+  if (!config.autoSync || !config.serverUrl || !config.token) {
+    schedule(SYNC_INTERVAL_MS);
+    return;
+  }
+  // While the iPad is offline there is nothing to try: keep the normal rhythm
+  // so a missed `online` event still recovers within a minute.
+  if (!navigator.onLine) {
+    schedule(SYNC_INTERVAL_MS);
+    return;
+  }
+  const pending = await pendingCount();
+  if (document.visibilityState === 'hidden' && pending === 0) {
+    schedule(SYNC_INTERVAL_MS);
+    return;
+  }
+  const outcome = await syncNow();
+  failures = outcome.ok ? 0 : failures + 1;
+  schedule(retryDelay(failures));
+}
 
 export function startAutoSync(): void {
   if (listenersBound) return;
   listenersBound = true;
-  const tick = () => {
-    void (async () => {
-      const config = await loadSyncConfig();
-      if (!config.autoSync || !config.serverUrl || !config.token) return;
-      const pending = await pendingCount();
-      if (document.visibilityState === 'hidden' && pending === 0) return;
-      await syncNow({ silent: true });
-    })();
-  };
-  window.setInterval(tick, 45000);
+  schedule(4000);
+  // Regaining a connection or returning to the app deserves an early attempt,
+  // not a wait for the current backoff to run out.
   window.addEventListener('online', () => {
-    void syncNow({ silent: true });
+    failures = 0;
+    schedule(1200);
   });
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') tick();
+    if (document.visibilityState === 'visible') schedule(900);
   });
-  window.setTimeout(tick, 4000);
 }
 
 export async function resolveConflict(seq: number, strategy: 'keep-local' | 'keep-server'): Promise<void> {

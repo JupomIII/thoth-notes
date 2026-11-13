@@ -38,6 +38,36 @@ function networkMessage(error: unknown): string {
   return 'Could not reach the laptop. Check the address, that both devices are on the same Wi-Fi, and that the certificate is trusted on this iPad.';
 }
 
+/** Keeps server prose short and readable; FastAPI errors arrive as JSON. */
+function cleanDetail(text: string): string {
+  const trimmed = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!trimmed) return '';
+  const readable = trimmed.length > 120 ? `${trimmed.slice(0, 117)}…` : trimmed;
+  return /^[{\[]/.test(readable) ? '' : readable;
+}
+
+/**
+ * One sentence a person can act on, instead of a status code and a stack trace.
+ * Exported because it is the sync UI's vocabulary, not an implementation detail.
+ */
+export function describeHttpStatus(status: number, detail = ''): string {
+  const extra = cleanDetail(detail);
+  const withDetail = (base: string) => (extra ? `${base} ${extra}` : base);
+  if (status === 400) return withDetail('The laptop could not read that request (HTTP 400).');
+  if (status === 404) {
+    return 'That address is not on the laptop (HTTP 404). Check the address and port shown in the server window.';
+  }
+  if (status === 409) return 'The laptop already holds a different copy of that item.';
+  if (status === 413) return 'That item is too large for the laptop to accept.';
+  if (status === 429) return 'The laptop is asking for a pause. Try again in a minute.';
+  if (status >= 500) {
+    return withDetail(
+      `The laptop hit an error (HTTP ${status}). Try again, and restart the server window if it keeps happening.`,
+    );
+  }
+  return withDetail(`The laptop answered HTTP ${status}.`);
+}
+
 /** Pairing exchanges a six-character code for the long-lived token. */
 export async function pairWithCode(
   rawUrl: string,
@@ -57,14 +87,14 @@ export async function pairWithCode(
     throw new SyncError(networkMessage(error), null, 'network');
   }
   if (response.status === 401) {
-    throw new SyncError('That code has expired. Run scripts\\pair.ps1 on the laptop for a fresh one.', 401, 'auth');
+    throw new SyncError('That pairing code has expired. Press Refresh code on the laptop, then type the new one.', 401, 'auth');
   }
   if (response.status === 429) {
-    throw new SyncError('Too many attempts. Restart the server window for a new code.', 429, 'auth');
+    throw new SyncError('Too many attempts. Wait a minute, then use the current code on the laptop.', 429, 'auth');
   }
   if (!response.ok) {
     const text = await response.text().catch(() => '');
-    throw new SyncError(`The laptop answered ${response.status}${text ? `: ${text.slice(0, 140)}` : ''}`, response.status, 'server');
+    throw new SyncError(describeHttpStatus(response.status, text), response.status, 'server');
   }
   return (await response.json()) as PairResponse;
 }
@@ -80,48 +110,34 @@ export class SyncClient {
     this.baseUrl = normalizeServerUrl(rawUrl);
   }
 
-  private async request<T>(
-    path: string,
-    init: RequestInit = {},
-    timeoutMs = 20000,
-  ): Promise<T> {
+  /** Aborts rather than leaving a spinner up forever on a sleeping laptop. */
+  private async send(path: string, init: RequestInit, timeoutMs: number): Promise<Response> {
     if (!this.baseUrl) throw new SyncError('Server address is empty', null, 'config');
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const response = await fetch(`${this.baseUrl}${path}`, {
+      return await fetch(`${this.baseUrl}${path}`, {
         ...init,
         signal: controller.signal,
-        headers: {
-          'X-Thoth-Token': this.token,
-          ...(init.headers ?? {}),
-        },
+        headers: { 'X-Thoth-Token': this.token, ...(init.headers ?? {}) },
       });
-      if (response.status === 401 || response.status === 403) {
-        throw new SyncError('Pairing token rejected', response.status, 'auth');
-      }
-      if (!response.ok) {
-        const text = await response.text().catch(() => '');
-        throw new SyncError(
-          `Server responded ${response.status}${text ? `: ${text.slice(0, 180)}` : ''}`,
-          response.status,
-          'server',
-        );
-      }
-      return (await response.json()) as T;
     } catch (error) {
-      if (error instanceof SyncError) throw error;
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new SyncError('Server did not answer in time', null, 'network');
-      }
-      throw new SyncError(
-        error instanceof Error ? error.message : 'Network request failed',
-        null,
-        'network',
-      );
+      throw new SyncError(networkMessage(error), null, 'network');
     } finally {
       window.clearTimeout(timer);
     }
+  }
+
+  private async request<T>(path: string, init: RequestInit = {}, timeoutMs = 20000): Promise<T> {
+    const response = await this.send(path, init, timeoutMs);
+    if (response.status === 401 || response.status === 403) {
+      throw new SyncError('The pairing token was rejected. Pair this iPad again from the laptop.', response.status, 'auth');
+    }
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new SyncError(describeHttpStatus(response.status, text), response.status, 'server');
+    }
+    return (await response.json()) as T;
   }
 
   health(): Promise<HealthResponse> {
@@ -149,23 +165,20 @@ export class SyncClient {
   }
 
   async uploadAsset(id: string, blob: Blob, mime: string): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/api/sync/assets/${id}`, {
-      method: 'PUT',
-      headers: { 'X-Thoth-Token': this.token, 'Content-Type': mime || 'application/octet-stream' },
-      body: blob,
-    });
+    const response = await this.send(
+      `/api/sync/assets/${id}`,
+      { method: 'PUT', headers: { 'Content-Type': mime || 'application/octet-stream' }, body: blob },
+      60000,
+    );
     if (!response.ok) {
-      throw new SyncError(`Asset upload failed (${response.status})`, response.status, 'server');
+      throw new SyncError(describeHttpStatus(response.status), response.status, 'server');
     }
   }
 
   async downloadAsset(id: string): Promise<Blob> {
-    const response = await fetch(`${this.baseUrl}/api/sync/assets/${id}`, {
-      method: 'GET',
-      headers: { 'X-Thoth-Token': this.token },
-    });
+    const response = await this.send(`/api/sync/assets/${id}`, { method: 'GET' }, 60000);
     if (!response.ok) {
-      throw new SyncError(`Asset download failed (${response.status})`, response.status, 'server');
+      throw new SyncError(describeHttpStatus(response.status), response.status, 'server');
     }
     return response.blob();
   }
@@ -178,34 +191,28 @@ export class SyncClient {
     return this.request<BackupInfo[]>('/api/backup/list', { method: 'GET' });
   }
 
-  exportBackup(): Promise<Blob> {
-    return fetch(`${this.baseUrl}/api/backup/export`, {
-      headers: { 'X-Thoth-Token': this.token },
-    }).then((response) => {
-      if (!response.ok) throw new SyncError(`Backup export failed (${response.status})`);
-      return response.blob();
-    });
+  async exportBackup(): Promise<Blob> {
+    const response = await this.send('/api/backup/export', { method: 'GET' }, 120000);
+    if (!response.ok) throw new SyncError(describeHttpStatus(response.status), response.status, 'server');
+    return response.blob();
   }
 
   async importBackup(file: Blob): Promise<ImportResult> {
-    const response = await fetch(`${this.baseUrl}/api/backup/import`, {
-      method: 'POST',
-      headers: { 'X-Thoth-Token': this.token, 'Content-Type': 'application/zip' },
-      body: file,
-    });
+    const response = await this.send(
+      '/api/backup/import',
+      { method: 'POST', headers: { 'Content-Type': 'application/zip' }, body: file },
+      120000,
+    );
     if (!response.ok) {
       const text = await response.text().catch(() => '');
-      throw new SyncError(`Backup import failed (${response.status}) ${text.slice(0, 160)}`);
+      throw new SyncError(describeHttpStatus(response.status, text), response.status, 'server');
     }
     return (await response.json()) as ImportResult;
   }
 
-  downloadBackup(name: string): Promise<Blob> {
-    return fetch(`${this.baseUrl}/api/backup/download/${encodeURIComponent(name)}`, {
-      headers: { 'X-Thoth-Token': this.token },
-    }).then((response) => {
-      if (!response.ok) throw new SyncError(`Backup download failed (${response.status})`);
-      return response.blob();
-    });
+  async downloadBackup(name: string): Promise<Blob> {
+    const response = await this.send(`/api/backup/download/${encodeURIComponent(name)}`, { method: 'GET' }, 120000);
+    if (!response.ok) throw new SyncError(describeHttpStatus(response.status), response.status, 'server');
+    return response.blob();
   }
 }

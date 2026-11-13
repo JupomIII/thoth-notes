@@ -140,3 +140,21 @@ def test_rejects_oversized_kind(client):
     record["kind"] = "galaxy"
     response = client.post("/api/sync/push", json={"deviceId": "device-a", "records": [record]})
     assert response.status_code == 422
+
+def test_repeated_rejected_push_records_one_conflict(client):
+    newer = notebook_record(9_000, "device-a", "Server copy")
+    client.post("/api/sync/push", json={"deviceId": "device-a", "records": [newer]}).raise_for_status()
+
+    stale = {
+        **newer,
+        "updatedAt": 8_000,
+        "data": {**newer["data"], "title": "Stale copy", "updatedAt": 8_000},
+    }
+    for _ in range(3):
+        response = client.post("/api/sync/push", json={"deviceId": "device-b", "records": [stale]})
+        assert response.status_code == 200
+        assert len(response.json()["conflicts"]) == 1
+
+    listed = client.get("/api/conflicts", params={"limit": 100}).json()["conflicts"]
+    mine = [row for row in listed if row["objectId"] == newer["id"]]
+    assert len(mine) == 1

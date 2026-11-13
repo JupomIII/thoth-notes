@@ -35,6 +35,34 @@ def _label(kind: str, data: dict[str, Any]) -> str:
     return "Attachment"
 
 
+def _record_conflict(
+    conn: sqlite3.Connection,
+    kind: str,
+    object_id: str,
+    label: str,
+    local: dict[str, Any],
+    server: dict[str, Any],
+) -> None:
+    """Stores one row per object and decision.
+
+    A push that is retried after a lost response carries the same losing copy
+    again; without this check the laptop piles up identical conflicts.
+    """
+    local_json = json.dumps(local)
+    server_json = json.dumps(server)
+    exists = conn.execute(
+        "SELECT 1 FROM conflicts WHERE kind = ? AND object_id = ? AND local = ? AND server = ?",
+        (kind, object_id, local_json, server_json),
+    ).fetchone()
+    if exists:
+        return
+    conn.execute(
+        "INSERT INTO conflicts(kind, object_id, label, local, server, created_at)"
+        " VALUES (?, ?, ?, ?, ?, ?)",
+        (kind, object_id, label, local_json, server_json, int(time.time() * 1000)),
+    )
+
+
 def _conflict_key(updated_at: int, device_id: str) -> tuple[int, str]:
     return (int(updated_at), str(device_id or ""))
 
@@ -93,32 +121,24 @@ def apply_record(conn: sqlite3.Connection, record: SyncRecord) -> tuple[dict[str
     )
 
     if not incoming_wins:
-        conn.execute(
-            "INSERT INTO conflicts(kind, object_id, label, local, server, created_at)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
-            (
-                record.kind,
-                record.id,
-                _label(record.kind, incoming_data),
-                json.dumps(incoming_data),
-                json.dumps(existing_data),
-                int(time.time() * 1000),
-            ),
+        _record_conflict(
+            conn,
+            record.kind,
+            record.id,
+            _label(record.kind, incoming_data),
+            incoming_data,
+            existing_data,
         )
         return existing_data, "rejected"
 
     # Preserve the losing server version for the iPad's conflict screen.
-    conn.execute(
-        "INSERT INTO conflicts(kind, object_id, label, local, server, created_at)"
-        " VALUES (?, ?, ?, ?, ?, ?)",
-        (
-            record.kind,
-            record.id,
-            _label(record.kind, existing_data),
-            json.dumps(existing_data),
-            json.dumps(incoming_data),
-            int(time.time() * 1000),
-        ),
+    _record_conflict(
+        conn,
+        record.kind,
+        record.id,
+        _label(record.kind, existing_data),
+        existing_data,
+        incoming_data,
     )
 
     updated_at = max(record.updatedAt, int(existing["updated_at"]) + 1)
