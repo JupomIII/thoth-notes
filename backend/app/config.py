@@ -41,6 +41,10 @@ def host_name() -> str:
 class Settings:
     host: str = "0.0.0.0"
     port: int = 8443
+    # Plain HTTP on the loopback interface: the laptop opens this and never sees
+    # a certificate warning. Browsers treat http://localhost as a secure context,
+    # so the service worker and offline storage work there too.
+    laptop_port: int = 8080
     # Same-origin requests never need CORS; these cover the GitHub Pages app and
     # a local Vite dev server. Add your own origin in storage/config.json.
     allowed_origins: list[str] = field(
@@ -135,6 +139,10 @@ class Settings:
             return str(self.public_url).strip().rstrip("/")
         scheme = "https" if self.tls else "http"
         return f"{scheme}://{local_ip()}:{self.port}"
+
+    @property
+    def laptop_url(self) -> str:
+        return f"http://localhost:{self.laptop_port}"
 
     @property
     def setup_url(self) -> str:

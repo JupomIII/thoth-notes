@@ -181,6 +181,8 @@ def run() -> None:
 
     use_tls = cfg.tls
     scheme = "https" if use_tls else "http"
+    # The laptop gets a plain HTTP door so it needs no certificate of any kind.
+    laptop_app = cfg.laptop_url if use_tls and not cfg.tunneled else f"{scheme}://localhost:{cfg.port}"
 
     print()
     print("  Thoth Notes local server")
@@ -188,8 +190,8 @@ def run() -> None:
     print(f"  iPad address   : {cfg.base_url}/")
     print(f"  LAN IP         : {local_ip()}:{cfg.port}")
     print(f"  Pairing code   : {pairing.current_code(cfg)}   (changes every {cfg.pair_code_minutes} min)")
-    print(f"  Pairing page   : {scheme}://localhost:{cfg.port}/pair   (open on the laptop)")
-    print(f"  App on laptop  : {scheme}://localhost:{cfg.port}/        (same app, pairs itself)")
+    print(f"  Pairing page   : {laptop_app}/pair   (open on the laptop)")
+    print(f"  App on laptop  : {laptop_app}/        (no certificate, pairs itself)")
     print("  Token          : stored locally in storage\\pairing-token.txt, never printed")
     print()
     if cfg.tunneled:
@@ -209,7 +211,7 @@ def run() -> None:
         print("  Served app     : bundled frontend at /")
     print()
 
-    uvicorn.run(
+    lan = uvicorn.Config(
         "app.main:app",
         host=cfg.host,
         port=cfg.port,
@@ -217,6 +219,27 @@ def run() -> None:
         ssl_certfile=str(cfg.cert_file) if use_tls else None,
         ssl_keyfile=str(cfg.key_file) if use_tls else None,
     )
+    if not use_tls or laptop_app.endswith(f":{cfg.port}"):
+        uvicorn.Server(lan).run()
+        return
+    loopback = uvicorn.Config(
+        "app.main:app",
+        host="127.0.0.1",
+        port=cfg.laptop_port,
+        log_level="info",
+        lifespan="off",  # the TLS server already started the app
+    )
+    _serve(lan, loopback)
+
+
+def _serve(*configs) -> None:
+    """Serves HTTPS for the LAN and plain HTTP for the laptop in one loop."""
+    import uvicorn
+
+    async def serve_all() -> None:
+        await asyncio.gather(*(uvicorn.Server(config).serve() for config in configs))
+
+    asyncio.run(serve_all())
 
 
 if __name__ == "__main__":

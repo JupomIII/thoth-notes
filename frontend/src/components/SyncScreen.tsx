@@ -604,12 +604,16 @@ export function SyncScreen() {
 
         <details className="rounded-xl border border-line bg-paper-sunken p-4 text-[12.5px] leading-relaxed text-ink-soft">
           <summary className="flex cursor-pointer select-none items-center gap-2 font-serif text-[16px] text-ink">
-            <ShieldCheck size={16} strokeWidth={1.8} /> Why the laptop needs a certificate
+            <ShieldCheck size={16} strokeWidth={1.8} /> Why only the iPad needs a certificate
           </summary>
           <p className="mt-2">
-            This app is served over HTTPS, and Safari refuses to let an HTTPS page call a plain <code>http://</code> address
-            on your network: it stops the request before it leaves the iPad. The laptop therefore has to speak
-            HTTPS with a certificate the iPad trusts.
+            The iPad runs this app from GitHub Pages over HTTPS, and Safari refuses to let an HTTPS page call a plain{' '}
+            <code>http://</code> address on your network: it stops the request before it leaves the iPad. The laptop
+            therefore speaks HTTPS with a certificate the iPad trusts.
+          </p>
+          <p className="mt-2">
+            On the laptop nothing is installed at all: the app opens at <code>http://localhost:8080</code> and talks to
+            the server over the machine's own loopback, where no certificate is involved and the browser never warns.
           </p>
           <p className="mt-2">
             The profile in step 1 does only that — it vouches for your own laptop. It never leaves the two devices, the
