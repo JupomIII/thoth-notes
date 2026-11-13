@@ -132,27 +132,37 @@ non-private client IPs and requires the token on every `/api` route except
 
 ## 4. Pair the iPad
 
-Install and trust `thoth-rootCA.cer` first (Settings → General → VPN & Device
-Management → Install, then Settings → General → About → Certificate Trust
-Settings).
+Install and trust the profile first. The iPad downloads it from the laptop — it
+is not emailed, AirDropped or copied by hand.
 
 `run.bat` opens a **pairing page in your browser** at
 `https://localhost:8443/pair` (the server itself runs minimised in the
-background). Point the iPad camera at the QR code on that page: the app opens on
-the sync screen, fills in the address, exchanges the six-character code for the
-token, stores everything locally and syncs. The same page has a
-**certificate download** for the iPad, a copy-link button and the code in case it
-is typed by hand under **Cloud → Synchronisation**. Codes change every thirty
-minutes and never contain the token; the page is only served to the laptop
-itself.
+background). That page lists the steps in order and shows the setup address, the
+QR code and the code itself.
 
-Browsers cannot browse the local network — Safari exposes no service-discovery
-API — so the QR code (or the copied link) is what replaces typing an address.
+1. On the iPad, open the **setup page**: `https://<laptop-address>:8443/setup`.
+   Accept Safari's warning once (*Show Details → Visit this Website*).
+2. Tap **Download the profile**, then install it: Settings → General → VPN &
+   Device Management → *Thoth Notes Local CA* → Install, and enable it under
+   Settings → General → About → **Certificate Trust Settings**.
+3. Scan the QR code on the pairing page with the iPad camera and tap the banner.
+   The app opens on the sync screen, exchanges the code for the token, stores it
+   and runs a first sync.
+
+The same page has a **copy-link** button and the code in case it is typed by hand
+under **Cloud → Synchronisation**. Codes change every thirty minutes and never
+contain the token; the pairing page is only served to the laptop itself.
 
 **HTTPS is not optional.** An installed PWA on GitHub Pages is an HTTPS origin;
 Safari blocks plain `http://` API calls as mixed content. The installer's
-locally-trusted certificate is the practical fix. Full walkthrough:
-[`docs/IPAD-SETUP.md`](docs/IPAD-SETUP.md).
+locally-trusted certificate is the practical fix for a LAN-only server. See
+[`docs/IPAD-SETUP.md`](docs/IPAD-SETUP.md) for the two-tap install, the exact
+wording of every Settings screen, and the **certificate-free option**: run the
+server behind a trusted address (`tailscale serve`, Cloudflare Tunnel) with
+`-PublicUrl` and no profile is needed on the iPad at all.
+
+Browsers cannot browse the local network — Safari exposes no service-discovery
+API — so the QR code (or the copied link) is what replaces typing an address.
 
 ## 5. The intended daily workflow
 
@@ -221,7 +231,7 @@ hardware checklist. Summary of what was executed for this build:
 
 * `frontend`: strict `tsc` typecheck, `vite build` with service worker, 19 Vitest
   unit tests (geometry, stroke splitting, expression parsing and graph analysis).
-* `backend`: 23 pytest tests (auth, push/pull, conflict preservation, tombstones,
+* `backend`: 29 pytest tests (auth, push/pull, conflict preservation, tombstones,
   asset round-trip, validation, backup round-trip, corrupted backup rejection,
   rotation).
 * Live server smoke test over real TLS: certificate generation, `/api/health`,
@@ -285,7 +295,9 @@ checklist.
 | `python -m app.cli status` | counts, paths, TLS state |
 | `python -m app.cli pair` | prints the current code, link and server address |
 | `python -m app.cli token` | prints the pairing token |
-| `python -m app.cli cert --force` | regenerates the certificate (re-trust on iPad) |
+| `python -m app.cli setup` | prints the setup address, pairing link, code and fingerprint |
+| `python -m app.cli public-url <url>` | uses a trusted tunnel address and drops the local certificate |
+| `python -m app.cli cert --force` | regenerates the CA too (the iPad installs a new profile) |
 
 ## 12. Security model
 
@@ -298,7 +310,12 @@ checklist.
   restrict further.
 * The token lives in `storage/pairing-token.txt` (gitignored) and in the iPad's
   IndexedDB; it is never logged by the app or committed.
-* The certificate and CA are generated on the machine and never leave it.
+* The certificate and CA are generated on the machine and never leave it. Keys are
+  ECDSA P-256, the CA is limited to signing server certificates (`path_length=0`)
+  and its private key stays in `storage/certs/ca-key.pem` so the server can renew
+  its own certificate without the iPad installing a second profile.
+* The trust profile is downloaded by the iPad from the laptop at `/setup`; it is
+  never transferred through a third party.
 
 Personal use only. No analytics, no telemetry, no third-party requests at
 runtime.

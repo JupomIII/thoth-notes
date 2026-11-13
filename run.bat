@@ -14,15 +14,21 @@ echo   Thoth Notes
 echo   -----------
 echo.
 
-REM Setup is needed when either the Python environment or the pairing token and
-REM certificate are missing; without the certificate the iPad cannot connect.
+REM Setup is needed when the Python environment, the pairing token or the trust
+REM profile is missing; without them the iPad cannot connect.
+REM A trusted public address (tunnel) replaces the certificate entirely.
+set "TUNNEL="
+if exist "backend\storage\config.json" (
+    findstr /C:"\"public_url\": \"http" "backend\storage\config.json" >nul 2>&1 && set "TUNNEL=1"
+)
+
 set "NEED_SETUP="
 if not exist "%VENV_PY%" set "NEED_SETUP=1"
 if not exist "%TOKEN_FILE%" set "NEED_SETUP=1"
-if not exist "%CERT%" set "NEED_SETUP=1"
+if not exist "%CERT%" if not defined TUNNEL set "NEED_SETUP=1"
 
 if defined NEED_SETUP (
-    echo   First run - installing the server, pairing token and certificate.
+    echo   First run - installing the server, pairing token and trust profile.
     echo   This may take a few minutes.
     echo.
     powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\install-windows.ps1"
@@ -40,9 +46,10 @@ if not exist "%VENV_PY%" (
     exit /b 1
 )
 
-if not exist "%CERT%" (
-    echo   No certificate in %CERT%.
-    echo   Run scripts\install-windows.ps1 to create the token and certificate.
+if not exist "%CERT%" if not defined TUNNEL (
+    echo   No certificate in %CERT% and no trusted address configured.
+    echo   Run scripts\install-windows.ps1 to create the token and certificate,
+    echo   or start the server with -PublicUrl if a tunnel fronts it.
     pause
     exit /b 1
 )
@@ -58,6 +65,8 @@ start "" "%PAIR_URL%"
 
 echo.
 echo   Pairing page : %PAIR_URL%  ^(opened in your browser^)
+echo   First time on the iPad: the pairing page lists the three steps.
+echo   The trust profile is downloaded from the laptop at /setup - never sent.
 echo   Scan the QR code there with the iPad camera.
 echo   The server runs in the minimised "Thoth Notes server" window.
 echo   Lost the code? powershell -ExecutionPolicy Bypass -File scripts\pair.ps1

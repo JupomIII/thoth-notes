@@ -1,131 +1,161 @@
-# Installing on iPad and trusting the local certificate
+# Getting Thoth Notes onto the iPad
 
-## 1. Deploy the frontend to GitHub Pages
+Three things happen here: the app goes on the Home Screen, the iPad learns to
+trust your laptop, and the two pair. Nothing is emailed, AirDropped or copied by
+hand — the trust profile is downloaded by the iPad from the laptop itself.
 
-GitHub Pages only ever hosts the **application build**. Notes live in the iPad's
-IndexedDB and, after a sync, on your Windows laptop. Nothing user-generated is
-committed to the repository.
+## 1. Install the app
 
-1. Push the repository to GitHub with `frontend/` at the path shown in
-   `.github/workflows/deploy.yml`.
+1. Push the repository to GitHub with `frontend/` where
+   `.github/workflows/deploy.yml` expects it.
 2. Repository → **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-3. Push to `main` (or run the workflow manually). The workflow type-checks,
-   runs the unit tests, builds and publishes `frontend/dist`.
-4. Note the URL: `https://<user>.github.io/<repo>/`.
+3. Push to `main`. The workflow type-checks, runs the tests, builds and publishes
+   `frontend/dist` to `https://<user>.github.io/<repo>/`.
+4. Open that URL in **Safari** on the iPad, wait for the first load, then
+   Share → **Add to Home Screen**.
+5. Launch it from the icon and check it opens offline: Airplane Mode, close the
+   app from the switcher, reopen it. The library must still be there.
 
-`frontend/vite.config.ts` uses `base: './'`, so the same build works at a
-project sub-path and at a custom domain root. `dist/404.html` is a copy of
-`index.html` because the app uses hash routing.
+`frontend/vite.config.ts` uses `base: './'`, so the same build also works at a
+custom domain root. `dist/404.html` is a copy of `index.html` because the app
+uses hash routing.
 
-## 2. Add to the Home Screen
-
-1. Open the Pages URL in **Safari** on the iPad (not in an embedded browser).
-2. Wait for the first load to finish; the service worker precaches the app shell
-   (16 files, ~2.5 MB, including the PDF renderer worker).
-3. Share → **Add to Home Screen**.
-4. Launch from the icon. It opens standalone, without Safari chrome.
-5. Verify offline behaviour: enable Airplane Mode, close the app from the app
-   switcher, reopen it. The library and notebooks must still open.
-
-The app requests persistent storage on first launch and shows the result in
-Settings → Storage. If iPadOS declines, export a backup regularly: Safari may
-evict site data under storage pressure.
-
-## 3. Run the Windows server
+## 2. Run the laptop server
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\install-windows.ps1
 powershell -ExecutionPolicy Bypass -File scripts\start-server.ps1
 ```
 
-The installer prints the certificate file (`backend\storage\certs\thoth-rootCA.cer`)
-and the HTTPS address, normally `https://<computer-name>.local:8443/`. A
-six-character pairing code is shown when the server starts, and
-`scripts\pair.ps1` prints a fresh code plus a one-tap pairing link at any time.
+Or just double-click **`run.bat`**, which installs on first run, starts the server
+in its own window and opens the pairing page in your browser.
 
-If the iPad cannot reach the server, run `scripts\allow-firewall.ps1` from an
+The server window prints, in this order:
+
+```
+  iPad address   : https://192.168.2.179:8443/
+  Pairing code   : K7QM4P          (changes every 30 min)
+  Pairing page   : https://localhost:8443/pair   (open on the laptop)
+
+  First time on the iPad - nothing to send or copy:
+    1. Open https://192.168.2.179:8443/setup in Safari on the iPad
+    2. Tap 'Download the profile', install it in Settings, then enable it
+       under Certificate Trust Settings
+    3. Scan the pairing QR code on the laptop's pairing page
+  Certificate    : 3F:9A:...:B1
+```
+
+If the iPad cannot reach the laptop, run `scripts\allow-firewall.ps1` from an
 **Administrator** PowerShell window. The rule is limited to the Private profile
-and `LocalSubnet`; the server itself also rejects any client that is not on a
-private address range.
+and `LocalSubnet`; the server itself also rejects any client outside private
+address ranges.
 
-## 4. Trust the certificate on iPadOS
+## 3. Trust the laptop, on the iPad
 
-A self-signed certificate must be installed *and* explicitly trusted, otherwise
-Safari shows an interstitial and `fetch()` from an installed PWA fails.
+Open the **setup page** printed above (`https://<address>:8443/setup`) in Safari
+on the iPad. It is served by your laptop and it walks through the four taps:
 
-1. Move `thoth-rootCA.cer` to the iPad (AirDrop, iCloud Drive, or the Files app).
-2. Tap the file → *Profile Downloaded*.
-3. **Settings → General → VPN & Device Management → Thoth Notes Local CA → Install**.
-4. **Settings → General → About → Certificate Trust Settings** → enable
-   *Thoth Notes Local CA*.
-5. Open `https://<computer-name>.local:8443/` in Safari. There must be **no**
-   warning page; a padlock confirms the chain is trusted.
+1. **Accept the warning once.** Safari warns because the laptop signs its own
+   certificate: *Show Details → Visit this Website*.
+2. **Download the profile.** The button on that page serves the CA straight from
+   the laptop. Safari says *Profile Downloaded*. Nothing was transferred by you.
+3. **Install it.** Settings → General → VPN & Device Management → *Thoth Notes
+   Local CA* → Install. Then Settings → General → About → **Certificate Trust
+   Settings** → switch *Thoth Notes Local CA* on. Both taps are required; iOS
+   installs profiles without trusting them by default.
+4. **Come back and pair.** Reload the setup page — no warning this time — then use
+   the app's sync screen.
 
-If your network has no working mDNS resolution for `.local`, use the IP address
-instead. The certificate contains both the hostname and the LAN IP as Subject
-Alternative Names. IP addresses can change with DHCP, so prefer the hostname or
-add a DHCP reservation.
+The page shows the certificate fingerprint and expiry so you can confirm you are
+looking at the right laptop.
 
-> Rotating the certificate (a new install with `--force`) requires installing the
-> new CA again, because a fresh CA is generated each time.
+### Why a certificate exists at all
 
-## 5. Pair the iPad
+GitHub Pages is an HTTPS origin and Safari refuses `http://` requests from it as
+mixed content; there is no override, not even for an installed web app. So the
+laptop must speak HTTPS with a certificate the iPad accepts. Apple does not let a
+web page install a certificate silently, which is why the last two taps in
+Settings are unavoidable **for a purely local server**.
 
-**Fastest way.** Double-click `run.bat` on the laptop. It starts the server
-minimised and opens `https://localhost:8443/pair` in your browser: a pairing page
-with a QR code, the code itself, a *copy pairing link* button and a certificate
-download for the iPad. Point the iPad camera at the QR code and tap the banner
-that appears — the app opens on the sync screen, fills in the address, exchanges
-the code for the token, stores it and runs a first sync. The link only carries
-the short-lived code, never the token, and the page is served only to the laptop
-itself.
+What changed from earlier versions:
 
-Web browsers have no API for discovering devices on the local network (Safari
-included), so a scan or a link is the closest thing to automatic pairing; there
-is nothing to type either way.
+* The profile is **downloaded from the laptop**, never sent as a file.
+* The CA key now stays in `backend\storage\certs\ca-key.pem`, so the server can
+  re-issue its own certificate when the LAN address changes — the profile on the
+  iPad keeps working. Reinstalling never produces a second profile.
+* Keys are ECDSA P-256, the CA may only sign server certificates, and the server
+  certificate is valid for 397 days and renewed automatically in the last week.
 
-**By hand.** Open **Cloud icon → Synchronisation** and enter:
+## 4. Pair
 
-* Laptop address: `https://<computer-name>.local:8443` (the app adds `https://`
-  if you omit the scheme).
-* Pairing code: six characters from the server window or `scripts\pair.ps1`;
-  it changes every thirty minutes and the previous code is accepted for one window.
-* **Pair** (or **Test connection** first, which should answer
-  *"<machine> · protocol v1"*).
+**Scan.** The pairing page on the laptop (`https://localhost:8443/pair`) shows a
+QR code. Point the iPad camera at it, tap the banner: the app opens on the sync
+screen with the address and code already filled in and pairs itself. The link
+carries only the short-lived code, never the token.
 
-The token is stored in the iPad's own IndexedDB and only sent to that address. It
-is never logged, never shown in full (only dots) and never placed in the URL: the
-app strips the code from the address bar as soon as it reads it. **Forget this
-laptop** removes it again.
+**Type.** App → **Synchronisation** → *Set up this iPad*. Step 1 has a
+**Check again** button that calls the laptop and tells you whether the
+certificate is trusted yet; step 2 takes the six characters from the server
+window. Codes change every thirty minutes and the previous one is accepted for
+one window.
 
-The sync screen also shows the destination: laptop name, its notes folder and
-how much is stored there, so you can confirm the notes land where you expect.
+The token is stored only in the iPad's IndexedDB, is never shown in full (dots
+only), never appears in a URL and is never logged. **Forget this laptop** removes
+it. The sync screen also shows the destination: laptop name, notes folder and how
+much is stored there.
 
-## Why HTTPS is mandatory
+## 5. If you would rather not install a certificate
 
-GitHub Pages is an HTTPS origin. Browsers block `http://` requests from an HTTPS
-page as mixed content — Safari does this for installed PWAs with no override.
-There is no client-side workaround: the server must speak TLS with a
-certificate the iPad trusts.
+A trusted public address removes the need for a profile completely. Any of these
+works because Safari already trusts the address:
 
-Two practical arrangements:
+**Tailscale (free for personal use).** Install Tailscale on the laptop and the
+iPad, sign both into the same tailnet, then on the laptop:
 
-1. **GitHub Pages app + HTTPS API** (above). Works offline and from anywhere;
-   cross-origin requests are allowed for `https://*.github.io` by the server's
-   CORS regex (`allow_origin_regex` in `backend/storage/config.json`).
-2. **Server-hosted app**. If the installer builds the frontend, the server
-   serves it at `https://<host>:8443/` — same origin as the API, no CORS at all,
-   and no dependency on GitHub. Add that page to the Home Screen of the iPad too
-   if you want a second, LAN-only install. Both installs share one origin only
-   if the origin matches; IndexedDB is per origin, so pick one as your main
-   writing app.
+```powershell
+tailscale serve --bg 8443
+```
 
-`http://` is still usable for a desktop browser on the same machine when no
-certificate exists (the server prints a warning), but never for the iPad PWA.
+Tailscale prints an address such as `https://jps-laptop.tailnet-name.ts.net`.
+Give it to the server once:
 
-## Updating
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\start-server.ps1 -PublicUrl https://jps-laptop.tailnet-name.ts.net
+```
 
-* **Frontend**: push to `main`. The new service worker downloads in the
-  background; the app shows a *Reload* prompt. No note data is touched.
-* **Backend**: `git pull`, then re-run `scripts\install-windows.ps1`
-  (it reuses the virtual environment and preserves `backend\storage`).
+The server then speaks plain HTTP behind the tunnel, no certificate is generated,
+`/setup` says there is nothing to install, and the pairing link points at the
+trusted address. Nothing needs to be installed on the iPad.
+
+**Cloudflare Tunnel** works the same way: point the tunnel at
+`http://localhost:8443` and pass its `https://…` hostname with `-PublicUrl`.
+
+Store or clear the address at any time:
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m app.cli public-url https://your-address.ts.net
+.\.venv\Scripts\python.exe -m app.cli public-url            # back to the local certificate
+```
+
+Keep the server on the private network either way: it rejects clients outside
+private address ranges, and every `/api` route except health and pairing needs
+the token.
+
+## 6. Updating
+
+* **Frontend**: push to `main`; the new service worker downloads in the
+  background and the app offers *Reload*. Notes are untouched.
+* **Backend**: `git pull`, then re-run `scripts\install-windows.ps1` — the virtual
+  environment and `backend\storage` are preserved. The certificate is re-issued
+  only if the machine's addresses changed, and it keeps the same CA.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Setup page will not open at all | Laptop asleep, wrong network, or firewall | Wake the laptop, check both are on the same Wi-Fi, run `scripts\allow-firewall.ps1` |
+| Warning returns after trusting | Profile installed but not enabled | Settings → General → About → Certificate Trust Settings |
+| "Check again" says no answer | Certificate not trusted yet, or server stopped | Finish step 3, then start the server window |
+| Paired, then *offline* | DHCP gave the laptop a new address | The certificate is re-issued on the next start; re-open the setup page and pair again with the new address |
+| New laptop, same iPad | Fingerprint changed | Install the new profile; the old one can be removed under VPN & Device Management |

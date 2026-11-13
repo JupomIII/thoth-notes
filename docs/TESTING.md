@@ -34,7 +34,7 @@ cd backend
 python -m venv .venv
 ./.venv/Scripts/python.exe -m pip install -r requirements.txt
 ./.venv/Scripts/python.exe -m pytest -q
-# 23 passed
+# 29 passed
 ```
 
 Coverage of the executed tests:
@@ -150,3 +150,19 @@ and every hardware check below.
 5. Export a notebook containing an equation, a graph and a table to PDF and check
    the printed sizes against the page.
 
+## Trust setup (executed)
+
+| Check | Result |
+| --- | --- |
+| `/setup` over real TLS | 200, `cache-control: no-store`, 7.6 kB page; steps appear in order (*Accept this laptop once* before *Download the profile*) |
+| `/ca` download | `application/x-x509-ca-cert` with `Content-Disposition: attachment; filename="thoth-rootCA.cer"`, DER payload present |
+| Pairing page | Contains the setup address, an **Open the iPad setup page** button and the QR code |
+| CA persistence | `ensure_certificates` writes `ca-key.pem`; a second call reuses certificate and fingerprint; a new address re-issues the leaf with the **same** fingerprint; `force=True` changes it |
+| Tunnel mode | With `public_url` set: `tls` is false, `base_url` is the tunnel address, certificate generation is skipped (`skipped: public-url`) and the setup page drops the certificate steps |
+| Console output | `python -m app` prints the address, code, three numbered iPad steps and the certificate fingerprint |
+| Sync screen, trusted laptop | Probe to a local JSON `/api/health` shows *JUPITER answered · protocol v1. The certificate is trusted on this iPad.* |
+| Sync screen, untrusted laptop | Probe against a self-signed HTTPS server shows the combined cause message (asleep/off network **or** certificate not trusted yet) |
+
+Not executed: the two Settings taps on a real iPad (no hardware here), and a
+live Tailscale or Cloudflare tunnel — tunnel mode was verified by configuration
+and page rendering only.

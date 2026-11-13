@@ -8,7 +8,8 @@
 #>
 [CmdletBinding()]
 param(
-    [int]$Port = 0
+    [int]$Port = 0,
+    [string]$PublicUrl = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -21,6 +22,10 @@ if (-not (Test-Path $venvPython)) {
 }
 
 if ($Port -gt 0) { $env:THOTH_PORT = $Port }
+if ($PublicUrl) {
+    & $venvPython -m app.cli public-url $PublicUrl | Out-Null
+    Write-Host "  Using trusted address $PublicUrl - no local certificate."
+}
 
 Push-Location $backend
 try {

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import socket
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from .config import BACKEND_DIR, Settings, settings, local_ip
 from .console import enable_utf8_output
 from . import pairing
 from .pair_page import render_pair_page
+from .setup_page import render_setup_page
 from .database.db import init_db
 from .security import LocalNetworkMiddleware, is_self_client
 
@@ -90,14 +92,35 @@ def create_app(config: Settings | None = None) -> FastAPI:
             )
         return HTMLResponse(render_pair_page(cfg))
 
+    @app.get("/setup", include_in_schema=False)
+    def setup_page() -> HTMLResponse:
+        """The iPad opens this to trust the laptop and download the profile."""
+        return HTMLResponse(
+            render_setup_page(cfg, machine=socket.gethostname()),
+            headers={"Cache-Control": "no-store"},
+        )
+
     @app.get("/ca", include_in_schema=False)
     def ca_profile() -> Response:
+        """Serves the CA as a profile the iPad installs with two taps."""
+        if cfg.tunneled:
+            return JSONResponse(
+                {
+                    "detail": "No certificate is needed: this server is published behind a trusted address.",
+                    "baseUrl": cfg.base_url,
+                },
+                status_code=404,
+            )
         if not cfg.ca_file.exists():
             return JSONResponse({"detail": "certificate not generated yet"}, status_code=404)
         return FileResponse(
             cfg.ca_file,
             media_type="application/x-x509-ca-cert",
             filename="thoth-rootCA.cer",
+            headers={
+                "Content-Disposition": 'attachment; filename="thoth-rootCA.cer"',
+                "Cache-Control": "no-store",
+            },
         )
 
     if FRONTEND_DIST.exists():
@@ -123,14 +146,28 @@ app = create_app()
 
 
 def run() -> None:
-    """Starts Uvicorn with TLS when the certificate pair exists."""
+    """Starts Uvicorn, terminating TLS locally only when no tunnel fronts us."""
     import uvicorn
 
     enable_utf8_output()
     cfg = settings
     init_db(cfg)
     cfg.ensure_token()
-    use_tls = cfg.cert_file.exists() and cfg.key_file.exists()
+
+    fingerprint = ""
+    if not cfg.tunneled:
+        try:
+            from .certs import ensure_certificates, fingerprint_of
+
+            issue = ensure_certificates(cfg)
+            if issue.get("reissued"):
+                log.info("Re-issued the server certificate for this machine's addresses")
+            fingerprint = str(issue.get("fingerprint") or fingerprint_of(cfg))
+        except RuntimeError as exc:  # cryptography missing
+            log.warning("Certificate setup skipped: %s", exc)
+
+    use_tls = cfg.tls
+    scheme = "https" if use_tls else "http"
 
     print()
     print("  Thoth Notes local server")
@@ -138,12 +175,22 @@ def run() -> None:
     print(f"  iPad address   : {cfg.base_url}/")
     print(f"  LAN IP         : {local_ip()}:{cfg.port}")
     print(f"  Pairing code   : {pairing.current_code(cfg)}   (changes every {cfg.pair_code_minutes} min)")
-    scheme = "https" if use_tls else "http"
     print(f"  Pairing page   : {scheme}://localhost:{cfg.port}/pair   (open on the laptop)")
     print("  Token          : stored locally in storage\\pairing-token.txt, never printed")
-    if not use_tls:
-        print("  WARNING: no TLS certificate found. Installed iPad PWAs cannot call http:// endpoints.")
-        print("           Run scripts\\install-windows.ps1 once to generate a trusted local certificate.")
+    print()
+    if cfg.tunneled:
+        print("  Trusted address in use: no certificate is needed on the iPad.")
+        print(f"  iPad setup     : {cfg.setup_url}")
+    elif use_tls:
+        print("  First time on the iPad - nothing to send or copy:")
+        print(f"    1. Open {cfg.setup_url} in Safari on the iPad")
+        print("    2. Tap 'Download the profile', install it in Settings, then enable it")
+        print("       under Certificate Trust Settings")
+        print("    3. Scan the pairing QR code on the laptop's pairing page")
+        print(f"  Certificate    : {fingerprint}")
+    else:
+        print("  WARNING: no TLS certificate yet. Installed iPad PWAs cannot call http:// endpoints.")
+        print("           Run scripts\\install-windows.ps1 once to create it.")
     if FRONTEND_DIST.exists():
         print("  Served app     : bundled frontend at /")
     print()

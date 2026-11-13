@@ -85,6 +85,8 @@ def pair_link(request: Request) -> dict:
         "code": pairing.current_code(settings),
         "link": pairing.pairing_link(settings),
         "serverUrl": settings.base_url,
+        "setupUrl": settings.setup_url,
+        "tunneled": settings.tunneled,
         "expiresIn": pairing.seconds_left(settings),
     }
 
@@ -123,7 +125,8 @@ def status() -> dict:
         "cursor": int(cursor),
         "devices": devices,
         "dataDir": str(settings.directory),
-        "tls": settings.cert_file.exists(),
+        "tls": settings.tls,
+                "tunneled": settings.tunneled,
         "baseUrl": settings.base_url,
     }
 

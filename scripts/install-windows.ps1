@@ -14,7 +14,8 @@
 [CmdletBinding()]
 param(
     [switch]$SkipFrontend,
-    [string[]]$ExtraIp = @()
+    [string[]]$ExtraIp = @(),
+    [string]$PublicUrl = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -79,7 +80,12 @@ Push-Location $backend
 try {
     $initArgs = @()
     foreach ($ip in $ExtraIp) { $initArgs += @('--ip', $ip) }
+    if ($PublicUrl) { $initArgs += @('--no-cert') }
     & $venvPython -m app.cli init @initArgs
+    if ($PublicUrl) {
+        & $venvPython -m app.cli public-url $PublicUrl | Out-Null
+        Write-Host "  Trusted address stored: $PublicUrl (no iPad certificate needed)"
+    }
 } finally {
     Pop-Location
 }
@@ -120,8 +126,18 @@ if ($isAdmin -and (Get-Command Get-NetFirewallRule -ErrorAction SilentlyContinue
 }
 
 Write-Host ''
+Write-Host ''
 Write-Host '  Setup complete.' -ForegroundColor Green
-Write-Host '  Pairing code  : shown when the server starts, or run scripts\pair.ps1 for a fresh one'
-Write-Host '  Certificate   : backend\storage\certs\thoth-rootCA.cer'
 Write-Host '  Start server  : powershell -ExecutionPolicy Bypass -File scripts\start-server.ps1'
+Write-Host ''
+Write-Host '  On the iPad, nothing is copied or sent:' -ForegroundColor Green
+Write-Host '    1. The server window prints the setup address (https://<ip>:8443/setup).'
+Write-Host '       Open it in Safari on the iPad and tap "Download the profile".'
+Write-Host '    2. Install it under Settings -> General -> VPN & Device Management, then'
+Write-Host '       enable it under Settings -> General -> About -> Certificate Trust Settings.'
+Write-Host '    3. Pair: scan the QR code on the pairing page, or run scripts\pair.ps1.'
+Write-Host ''
+Write-Host '  Only this iPad trusts this laptop: the CA key stays in backend\storage\certs.'
+Write-Host '  A DHCP change re-issues the server certificate automatically; the profile'
+Write-Host '  on the iPad keeps working because the CA itself does not change.'
 Write-Host ''

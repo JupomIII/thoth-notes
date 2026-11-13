@@ -34,6 +34,8 @@ def cmd_init(args: argparse.Namespace) -> int:
         except RuntimeError as exc:
             result["certificateError"] = str(exc)
     result["baseUrl"] = settings.base_url
+    result["setupUrl"] = settings.setup_url
+    result["tunneled"] = settings.tunneled
     print(json.dumps(result, indent=2))
     return 0
 
@@ -61,6 +63,7 @@ def cmd_pair(args: argparse.Namespace) -> int:
                 "serverUrl": settings.base_url,
                 "hostname": f"{host_name().lower()}.local",
                 "certificate": str(settings.ca_file),
+                "setupUrl": settings.setup_url,
             },
             indent=2,
         )
@@ -72,6 +75,37 @@ def cmd_cert(args: argparse.Namespace) -> int:
     from .certs import ensure_certificates
 
     print(json.dumps(ensure_certificates(settings, extra_hosts=args.ip, force=args.force), indent=2))
+    return 0
+
+
+def cmd_public_url(args: argparse.Namespace) -> int:
+    """Stores (or clears) the trusted address that fronts this server."""
+    settings.public_url = (args.url or "").strip()
+    settings.save()
+    print(json.dumps({"publicUrl": settings.public_url, "setupUrl": settings.setup_url}, indent=2))
+    return 0
+
+
+def cmd_setup(_args: argparse.Namespace) -> int:
+    """Prints the addresses the iPad needs, in the order it needs them."""
+    settings.ensure_token()
+    from .certs import ensure_certificates, fingerprint_of
+
+    issue = ensure_certificates(settings)
+    print(json.dumps(
+        {
+            "setupUrl": settings.setup_url,
+            "serverUrl": settings.base_url,
+            "pairingLink": pairing.pairing_link(settings),
+            "code": pairing.current_code(settings),
+            "expiresIn": pairing.seconds_left(settings),
+            "certificate": str(settings.ca_file) if not settings.tunneled else None,
+            "fingerprint": fingerprint_of(settings) if not settings.tunneled else None,
+            "reissued": issue.get("reissued", False),
+            "tunneled": settings.tunneled,
+        },
+        indent=2,
+    ))
     return 0
 
 
@@ -97,7 +131,9 @@ def cmd_status(_args: argparse.Namespace) -> int:
                 "baseUrl": settings.base_url,
                 "counts": counts,
                 "conflicts": conflicts,
-                "tls": settings.cert_file.exists(),
+                "tls": settings.tls,
+                "tunneled": settings.tunneled,
+                "setupUrl": settings.setup_url,
                 "tokenFile": str(settings.token_path),
             },
             indent=2,
@@ -122,6 +158,13 @@ def main(argv: list[str] | None = None) -> int:
     pair = sub.add_parser("pair", help="print the current pairing code and link")
     pair.add_argument("--qr", action="store_true", help="also print a scannable QR code")
     pair.set_defaults(func=cmd_pair)
+
+    public = sub.add_parser("public-url", help="store a trusted address for this server (tunnel or proxy)")
+    public.add_argument("url", nargs="?", default="", help="https://host[:port]; empty to clear")
+    public.set_defaults(func=cmd_public_url)
+
+    setup = sub.add_parser("setup", help="print the iPad setup and pairing addresses")
+    setup.set_defaults(func=cmd_setup)
 
     cert = sub.add_parser("cert", help="(re)generate the local certificate")
     cert.add_argument("--ip", action="append", default=[])

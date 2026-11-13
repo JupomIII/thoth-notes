@@ -49,6 +49,12 @@ class Settings:
     allow_origin_regex: str = r"https://[A-Za-z0-9-]+\.github\.io"
     # Where the pairing link opens the app; the code in the link expires quickly.
     pair_app_url: str = "https://jupomiii.github.io/thoth-notes"
+    # Optional trusted HTTPS address for this server (Tailscale, Cloudflare
+    # tunnel, reverse proxy). When set, the server speaks plain HTTP on the loop
+    # back side of the tunnel and no local certificate is used at all.
+    public_url: str = ""
+    ca_valid_days: int = 1825
+    leaf_valid_days: int = 397
     pair_code_minutes: int = 30
     rotate_keep: int = 7
     auto_backup_hours: int = 24
@@ -102,9 +108,37 @@ class Settings:
         return self.cert_dir / "thoth-rootCA.cer"
 
     @property
+    def ca_pem(self) -> Path:
+        return self.cert_dir / "thoth-rootCA.pem"
+
+    @property
+    def ca_key_file(self) -> Path:
+        return self.cert_dir / "ca-key.pem"
+
+    @property
+    def tunneled(self) -> bool:
+        """True when a public HTTPS address fronts this server."""
+        return bool(str(self.public_url).strip())
+
+    @property
+    def tls(self) -> bool:
+        """True when Uvicorn should terminate TLS itself."""
+        return (
+            not self.tunneled
+            and self.cert_file.exists()
+            and self.key_file.exists()
+        )
+
+    @property
     def base_url(self) -> str:
-        scheme = "https" if self.cert_file.exists() else "http"
+        if self.tunneled:
+            return str(self.public_url).strip().rstrip("/")
+        scheme = "https" if self.tls else "http"
         return f"{scheme}://{local_ip()}:{self.port}"
+
+    @property
+    def setup_url(self) -> str:
+        return f"{self.base_url}/setup"
 
     def load(self) -> "Settings":
         if self.config_path.exists():
