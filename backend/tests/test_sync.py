@@ -158,3 +158,22 @@ def test_repeated_rejected_push_records_one_conflict(client):
     listed = client.get("/api/conflicts", params={"limit": 100}).json()["conflicts"]
     mine = [row for row in listed if row["objectId"] == newer["id"]]
     assert len(mine) == 1
+
+def test_ordinary_edits_record_no_conflicts(client):
+    record = notebook_record(10_000, "device-a", "Draft")
+    client.post("/api/sync/push", json={"deviceId": "device-a", "records": [record]}).raise_for_status()
+
+    for step, title in enumerate(["Second draft", "Third draft"], start=1):
+        stamp = 10_000 + step * 1_000
+        edited = {
+            **record,
+            "updatedAt": stamp,
+            "version": step + 1,
+            "data": {**record["data"], "title": title, "updatedAt": stamp, "version": step + 1},
+        }
+        response = client.post("/api/sync/push", json={"deviceId": "device-a", "records": [edited]})
+        assert response.status_code == 200
+        assert response.json()["conflicts"] == [], response.json()
+
+    listed = client.get("/api/conflicts", params={"limit": 200}).json()["conflicts"]
+    assert [row for row in listed if row["objectId"] == record["id"]] == []

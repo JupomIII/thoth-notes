@@ -176,10 +176,10 @@ async function runSync(): Promise<SyncOutcome> {
           kind: conflict.kind,
           objectId: conflict.id,
           label: describeRecord(conflict.kind, conflict.client.data),
-          local: conflict.client.data,
-          server: conflict.server.data,
+          local: withoutBlob(conflict.client.data),
+          server: withoutBlob(conflict.server.data),
         });
-        await applyRemoteRecord(conflict.server);
+        await applyIncoming(conflict.server);
         await clearOutboxFor(conflict.kind, conflict.id);
         conflictCount += 1;
       }
@@ -331,13 +331,33 @@ async function recordConflict(entry: PendingConflict): Promise<void> {
   await db.conflicts.add({ ...entry, createdAt: now() });
 }
 
+/** A pulled asset carries metadata only; the bytes stay wherever they already are. */
+async function applyIncoming(record: SyncRecord): Promise<void> {
+  if (record.kind !== 'asset') {
+    await applyRemoteRecord(record);
+    return;
+  }
+  const existing = (await db.assets.get(record.id)) as StoredAsset | undefined;
+  const next = { ...(record.data as StoredAsset) };
+  if (existing?.blob) next.blob = existing.blob;
+  await db.assets.put(next);
+}
+
+function withoutBlob(entity: unknown): unknown {
+  if (entity && typeof entity === 'object' && 'blob' in (entity as Record<string, unknown>)) {
+    const { blob: _blob, ...rest } = entity as Record<string, unknown>;
+    return rest;
+  }
+  return entity;
+}
+
 async function applyPulledRecord(record: SyncRecord): Promise<{ applied: boolean; conflict: boolean }> {
   const local = await readEntity(record.kind, record.id);
   if (!local) {
-    await applyRemoteRecord(record);
+    await applyIncoming(record);
     return { applied: true, conflict: false };
   }
-  if (sameJson(local, record.data)) {
+  if (sameJson(withoutBlob(local), record.data)) {
     await clearOutboxFor(record.kind, record.id);
     return { applied: false, conflict: false };
   }
@@ -347,15 +367,15 @@ async function applyPulledRecord(record: SyncRecord): Promise<{ applied: boolean
       kind: record.kind,
       objectId: record.id,
       label: describeRecord(record.kind, record.data),
-      local,
-      server: record.data,
+      local: withoutBlob(local),
+      server: withoutBlob(record.data),
     });
-    await applyRemoteRecord(record);
+    await applyIncoming(record);
     await clearOutboxFor(record.kind, record.id);
     return { applied: true, conflict: true };
   }
   if (record.updatedAt >= local.updatedAt) {
-    await applyRemoteRecord(record);
+    await applyIncoming(record);
     return { applied: true, conflict: false };
   }
   await markOutbox(record.kind, record.id);

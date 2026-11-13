@@ -99,6 +99,9 @@ millisecond still agree on the winner without a round trip.
 
 ### What the Windows server does with a conflict
 
+* A conflict row is written only when an incoming write **loses**. An ordinary
+  newer write wins silently and records nothing, so the list stays a list of
+  disagreements rather than a history of edits.
 * The losing copy is appended to `conflicts` (kind, object id, label, both
   payloads, timestamp). One row per object and decision: a push retried after a
   lost response does not duplicate the entry.
@@ -141,3 +144,35 @@ device that was offline still learns about deletions.
   attempt within a second.
 * `lastSyncAt` only moves when a run finishes, so the screen never claims a sync
   that did not happen.
+
+## Verified round trip
+
+The flow below was run end to end against a live Python server (its own data
+directory, plain HTTP on a spare port) with the real client modules
+`src/sync/client.ts`, `src/sync/engine.ts` and the Dexie outbox, in a browser
+with a fresh IndexedDB. Nothing was mocked: the only simulation is a second
+device, which pushed records over the same token with `deviceId: "laptop-sim"`,
+exactly as the laptop or the other iPad does. A temporary harness page drove the
+phases and was removed afterwards.
+
+| Phase | Exercised | Observed |
+| --- | --- | --- |
+| Pairing | `pairWithCode`, token storage, `/api/health`, `/api/status` | token accepted, wrong token 401, URL normalised in the stored config |
+| First push | folder, notebook, page, stroke, text, PDF attachment | `Synced 6 up · 0 down`, outbox empty, server counts `{asset 1, folder 1, notebook 1, page 1, stroke 1, text 1}`, bytes identical via `GET /api/sync/assets/{id}` |
+| First pull | two records pushed by the other device | both landed locally, `pulled: 2`, nothing queued by the pull |
+| Incremental | local edit → server, local page delete → tombstone, server edit → local, server tombstone → local | each direction applied, then an idle run reported `Synced 0 up · 0 down` |
+| Conflict | iPad edit raced by the other device; losing push retried twice | one row on the iPad, one row on the server, losing copy preserved on both, winner canonical, retries added nothing |
+| Attachment | fresh upload, then a `PUT` interrupted mid-flight | interrupted run failed loudly, server 404 on the bytes, the record stayed queued, next run uploaded it intact |
+| Outage | server stopped, two manual runs | both failed with the plain sentence, two changes stayed queued, no conflict rows invented |
+| Pacing | the real scheduler with the laptop down | waits of 4 s, 86.7 s, 171.2 s, 308.1 s, 283.1 s (five-minute cap with jitter); returning to the app asked for 900 ms |
+| Recovery | server restarted, one run | `Synced 2 up · 0 down`, queue drained, both records on the server, still one conflict row |
+
+Two defects were found by that run and fixed:
+
+* every ordinary accepted edit used to write a conflict row, so the list filled
+  with routine edits; only rejected writes record one now;
+* a pulled or echoed attachment lost the bytes this iPad already had and
+  re-downloaded them; the local blob is kept now.
+
+Not covered: a physical iPad, a Windows-hosted server on the LAN, and Safari's
+own storage and certificate behaviour.

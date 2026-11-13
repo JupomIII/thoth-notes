@@ -131,16 +131,10 @@ def apply_record(conn: sqlite3.Connection, record: SyncRecord) -> tuple[dict[str
         )
         return existing_data, "rejected"
 
-    # Preserve the losing server version for the iPad's conflict screen.
-    _record_conflict(
-        conn,
-        record.kind,
-        record.id,
-        _label(record.kind, existing_data),
-        existing_data,
-        incoming_data,
-    )
-
+    # No conflict row here on purpose: this is an ordinary newer write, and the
+    # losing device still has its copy in its own queue. It will be rejected when
+    # it arrives, which is where the disagreement is recorded once. Recording the
+    # superseded copy here filled the conflict list with every routine edit.
     updated_at = max(record.updatedAt, int(existing["updated_at"]) + 1)
     version = int(existing["version"]) + 1
     seq = next_seq(conn)
